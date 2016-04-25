@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.projecttango.examples.java.floorplan;
+package com.favendo.steinmeyer.christian.tango.groundplan;
 
 import org.rajawali3d.math.vector.Vector3;
 

@@ -16,4 +16,4 @@
 /**
  * A sample showing how to build a 2d floor plan using Tango.
  */
-package com.projecttango.examples.java.floorplan;
+package com.favendo.steinmeyer.christian.tango.groundplan;

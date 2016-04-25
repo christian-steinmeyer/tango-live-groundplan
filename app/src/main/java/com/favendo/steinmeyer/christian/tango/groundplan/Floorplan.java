@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.projecttango.examples.java.floorplan;
+package com.favendo.steinmeyer.christian.tango.groundplan;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
