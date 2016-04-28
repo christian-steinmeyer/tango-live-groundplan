@@ -16,17 +16,6 @@
 
 package com.favendo.steinmeyer.christian.tango.groundplan;
 
-import com.google.atap.tangoservice.Tango;
-import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
-import com.google.atap.tangoservice.TangoCameraIntrinsics;
-import com.google.atap.tangoservice.TangoConfig;
-import com.google.atap.tangoservice.TangoCoordinateFramePair;
-import com.google.atap.tangoservice.TangoEvent;
-import com.google.atap.tangoservice.TangoException;
-import com.google.atap.tangoservice.TangoOutOfDateException;
-import com.google.atap.tangoservice.TangoPoseData;
-import com.google.atap.tangoservice.TangoXyzIjData;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -42,6 +31,23 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import com.google.atap.tangoservice.Tango;
+import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
+import com.google.atap.tangoservice.TangoCameraIntrinsics;
+import com.google.atap.tangoservice.TangoConfig;
+import com.google.atap.tangoservice.TangoCoordinateFramePair;
+import com.google.atap.tangoservice.TangoEvent;
+import com.google.atap.tangoservice.TangoException;
+import com.google.atap.tangoservice.TangoOutOfDateException;
+import com.google.atap.tangoservice.TangoPoseData;
+import com.google.atap.tangoservice.TangoXyzIjData;
+import com.projecttango.examples.java.floorplan.R;
+import com.projecttango.rajawali.DeviceExtrinsics;
+import com.projecttango.rajawali.ScenePoseCalculator;
+import com.projecttango.tangosupport.TangoPointCloudManager;
+import com.projecttango.tangosupport.TangoSupport;
+import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
+
 import org.rajawali3d.math.Matrix4;
 import org.rajawali3d.math.vector.Vector3;
 import org.rajawali3d.scene.ASceneFrameCallback;
@@ -51,33 +57,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.DeviceExtrinsics;
-import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.tangosupport.TangoPointCloudManager;
-import com.projecttango.tangosupport.TangoSupport;
-import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
-
 /**
  * An example showing how to build a very simple application that allows the user to create a floor
  * plan in Java. It uses TangoSupportLibrary to do plane fitting using the point cloud data.
  * When the user clicks on the display, plane detection is done on the surface at the location of
  * the click and a 3D object will be placed in the scene anchored at that location. A
  * {@code WallMeasurement} will be recorded for that plane.
- *
+ * <p/>
  * You need to take exactly one measurement per wall in clockwise order. As you take measurements,
  * the perimeter of the floor plan will be displayed as lines in AR. After you have taken all the
  * measurements you can press the 'Done' button and the final result will be drawn in 2D as seen
  * from above along with labels showing the sizes of the walls.
- *
+ * <p/>
  * You are going to be building an ADF as you take the measurements. After pressing the 'Done'
  * button the ADF will be saved and an optimization will be run on it. After that, all the recorded
  * measurements are re-queried and the floor plan will be rebuilt in order to have better precision.
- *
+ * <p/>
  * Note that it is important to include the KEY_BOOLEAN_LOWLATENCYIMUINTEGRATION configuration
  * parameter in order to achieve the best results synchronizing the Rajawali virtual world with the
  * RGB camera.
- *
+ * <p/>
  * For more details on the augmented reality effects, including color camera texture rendering,
  * see java_augmented_reality_example or java_hello_video_example.
  */
@@ -416,11 +415,28 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 rgbTimestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR,
                 xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
 
+        List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs = new ArrayList<IntersectionPointPlaneModelPair>();
+
         // Perform plane fitting with the latest available point cloud data.
-        IntersectionPointPlaneModelPair intersectionPointPlaneModelPair =
+        // touch location
+        IntersectionPointPlaneModelPair touchLocationPlane =
                 TangoSupport.fitPlaneModelNearClick(xyzIj, mIntrinsics,
                         colorTdepthPose, u, v);
 
+        for (float horizontal = 0.1f; horizontal < 1f; horizontal = horizontal + 0.1f) {
+            for (float vertical = 0.2f; vertical < 1f; vertical = vertical + 0.2f) {
+                intersectionPointPlaneModelPairs.add(
+                        TangoSupport.fitPlaneModelNearClick(xyzIj, mIntrinsics,
+                                colorTdepthPose, horizontal, vertical));
+            }
+        }
+
+        intersectionPointPlaneModelPairs = removeOutliers(touchLocationPlane, intersectionPointPlaneModelPairs);
+        intersectionPointPlaneModelPairs.add(touchLocationPlane);
+        IntersectionPointPlaneModelPair average = averagePlaneModel(intersectionPointPlaneModelPairs);
+
+        Log.d(TAG, "Correction:");
+        Log.d(TAG, String.valueOf(getDifference(average, touchLocationPlane)));
         // Get the device pose at the time the plane data was acquired.
         TangoPoseData devicePose =
                 mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
@@ -428,10 +444,82 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         // Update the AR object location.
         TangoPoseData planeFitPose = calculatePlanePose(
-                intersectionPointPlaneModelPair.intersectionPoint,
-                intersectionPointPlaneModelPair.planeModel, devicePose);
+                average.intersectionPoint,
+                average.planeModel, devicePose);
 
         return new WallMeasurement(planeFitPose, devicePose);
+    }
+
+    private double getDifference(IntersectionPointPlaneModelPair left, IntersectionPointPlaneModelPair right) {
+        double result = 0;
+        for (int i = 0; i < 4; i++) {
+            result += Math.abs(left.planeModel[i] - right.planeModel[i]);
+        }
+        return result;
+    }
+
+    private IntersectionPointPlaneModelPair averagePlaneModel(List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+        double[] planeModel = new double[4];
+        for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
+            for (int i = 0; i < 4; i++) {
+                planeModel[i] += each.planeModel[i];
+            }
+        }
+        for (int i = 0; i < 4; i++) {
+            planeModel[i] = planeModel[i] / intersectionPointPlaneModelPairs.size();
+        }
+        double[] intersectionPoint = intersectionPointPlaneModelPairs.get(intersectionPointPlaneModelPairs.size() - 1).intersectionPoint;
+        return new TangoSupport.IntersectionPointPlaneModelPair(intersectionPoint, planeModel);
+    }
+
+    private List<IntersectionPointPlaneModelPair> removeOutliers(
+            IntersectionPointPlaneModelPair original,
+            List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+        Log.d(TAG, "Touch Location:");
+        Log.d(TAG, getPrettyString(original));
+        Log.d(TAG, "Removing outliers");
+
+        List<IntersectionPointPlaneModelPair> result = new ArrayList<IntersectionPointPlaneModelPair>();
+        for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
+            Log.d(TAG, getPrettyString(each));
+            if (closeTo(original, each)) {
+                result.add(each);
+            }
+        }
+        return result;
+    }
+
+    private boolean closeTo(IntersectionPointPlaneModelPair original, IntersectionPointPlaneModelPair other) {
+        for (int i = 0; i < original.planeModel.length; i++) {
+            double proportion = original.planeModel[i] / other.planeModel[i];
+            if (proportion < 0.95 || proportion > 1.05) {
+                Log.d(TAG, "\tremoved: " + proportion);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String getPrettyString(IntersectionPointPlaneModelPair pair) {
+        String result = "[";
+
+        result += "IP(";
+        for (double each : pair.intersectionPoint) {
+            result += each > 0 ? " " + String.format("%.3f", each) : String.format("%.3f", each);
+            result += "|";
+        }
+        result = result.substring(0, result.length() - 2);
+        result += ")";
+
+        result += " PM(";
+        for (double each : pair.planeModel) {
+            result += each > 0 ? " " + String.format("%.3f", each) : String.format("%.3f", each);
+            result += "|";
+        }
+        result = result.substring(0, result.length() - 2);
+        result += ")";
+
+        return result + "]";
     }
 
     /**
