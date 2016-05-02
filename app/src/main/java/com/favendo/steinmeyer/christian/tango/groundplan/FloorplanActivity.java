@@ -59,10 +59,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * An example showing how to build a very simple application that allows the user to create a floor
- * plan in Java. It uses TangoSupportLibrary to do plane fitting using the point cloud data.
- * When the user clicks on the display, plane detection is done on the surface at the location of
- * the click and a 3D object will be placed in the scene anchored at that location. A
- * {@code WallMeasurement} will be recorded for that plane.
+ * plan in Java. It uses TangoSupportLibrary to do plane fitting using the point cloud data. When
+ * the user clicks on the display, plane detection is done on the surface at the location of the
+ * click and a 3D object will be placed in the scene anchored at that location. A {@code
+ * WallMeasurement} will be recorded for that plane.
  * <p/>
  * You need to take exactly one measurement per wall in clockwise order. As you take measurements,
  * the perimeter of the floor plan will be displayed as lines in AR. After you have taken all the
@@ -71,22 +71,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p/>
  * You are going to be building an ADF as you take the measurements. After pressing the 'Done'
  * button the ADF will be saved and an optimization will be run on it. After that, all the recorded
- * measurements are re-queried and the floor plan will be rebuilt in order to have better precision.
+ * measurements are re-queried and the floor plan will be rebuilt in order to have better
+ * precision.
  * <p/>
  * Note that it is important to include the KEY_BOOLEAN_LOWLATENCYIMUINTEGRATION configuration
  * parameter in order to achieve the best results synchronizing the Rajawali virtual world with the
  * RGB camera.
  * <p/>
- * For more details on the augmented reality effects, including color camera texture rendering,
- * see java_augmented_reality_example or java_hello_video_example.
+ * For more details on the augmented reality effects, including color camera texture rendering, see
+ * java_augmented_reality_example or java_hello_video_example.
  */
 public class FloorplanActivity extends Activity implements View.OnTouchListener {
     private static final String TAG = FloorplanActivity.class.getSimpleName();
     // Record Device to Area Description as the main frame pair to be used for device pose
     // queries.
-    private static final TangoCoordinateFramePair FRAME_PAIR = new TangoCoordinateFramePair(
-            TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION,
-            TangoPoseData.COORDINATE_FRAME_DEVICE);
+    private static final TangoCoordinateFramePair FRAME_PAIR =
+            new TangoCoordinateFramePair(TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION,
+                    TangoPoseData.COORDINATE_FRAME_DEVICE);
     private static final int INVALID_TEXTURE_ID = -1;
 
     private RajawaliSurfaceView mSurfaceView;
@@ -170,8 +171,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         if (requestCode == Tango.TANGO_INTENT_ACTIVITYCODE) {
             // Make sure the request was successful
             if (resultCode == RESULT_CANCELED) {
-                Toast.makeText(this, "Area Learning Permissions Required!",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Area Learning Permissions Required!", Toast.LENGTH_SHORT)
+                        .show();
                 finish();
             } else {
                 connectAndStart();
@@ -191,8 +192,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                     connectTango();
                     connectRenderer();
                 } catch (TangoOutOfDateException e) {
-                    Toast.makeText(getApplicationContext(),
-                            R.string.exception_out_of_date,
+                    Toast.makeText(getApplicationContext(), R.string.exception_out_of_date,
                             Toast.LENGTH_SHORT).show();
                 }
             }
@@ -299,8 +299,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                     // If a new RGB frame has been rendered, update the camera pose to match.
                     if (mRgbTimestampGlThread > mCameraPoseTimestamp) {
                         // Calculate the device pose at the camera frame update time.
-                        TangoPoseData lastFramePose = mTango.getPoseAtTime(mRgbTimestampGlThread,
-                                FRAME_PAIR);
+                        TangoPoseData lastFramePose =
+                                mTango.getPoseAtTime(mRgbTimestampGlThread, FRAME_PAIR);
                         if (lastFramePose.statusCode == TangoPoseData.POSE_VALID) {
                             // Update the camera pose from the renderer
                             mRenderer.updateRenderCameraPose(lastFramePose);
@@ -330,8 +330,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     /**
-     * Calculates and stores the fixed transformations between the device and
-     * the various sensors to be used later for transformations between frames.
+     * Calculates and stores the fixed transformations between the device and the various sensors to
+     * be used later for transformations between frames.
      */
     private static DeviceExtrinsics setupExtrinsics(Tango tango) {
         // Create camera to IMU transform.
@@ -382,13 +382,11 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 }
 
             } catch (TangoException t) {
-                Toast.makeText(getApplicationContext(),
-                        R.string.failed_measurement,
+                Toast.makeText(getApplicationContext(), R.string.failed_measurement,
                         Toast.LENGTH_SHORT).show();
                 Log.e(TAG, getString(R.string.failed_measurement), t);
             } catch (SecurityException t) {
-                Toast.makeText(getApplicationContext(),
-                        R.string.failed_permissions,
+                Toast.makeText(getApplicationContext(), R.string.failed_permissions,
                         Toast.LENGTH_SHORT).show();
                 Log.e(TAG, getString(R.string.failed_permissions), t);
             }
@@ -398,8 +396,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
     /**
      * Use the TangoSupport library and point cloud data to calculate the plane at the specified
-     * location in the color camera frame.
-     * It returns the pose of the fitted plane in a TangoPoseData structure.
+     * location in the color camera frame. It returns the pose of the fitted plane in a
+     * TangoPoseData structure.
      */
     private WallMeasurement doWallMeasurement(float u, float v, double rgbTimestamp) {
         TangoXyzIjData xyzIj = mPointCloudManager.getLatestXyzIj();
@@ -411,46 +409,77 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         // We need to calculate the transform between the color camera at the
         // time the user clicked and the depth camera at the time the depth
         // cloud was acquired.
-        TangoPoseData colorTdepthPose = TangoSupport.calculateRelativePose(
-                rgbTimestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR,
-                xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
+        TangoPoseData colorTdepthPose = TangoSupport
+                .calculateRelativePose(rgbTimestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR,
+                        xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
 
-        List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs = new ArrayList<IntersectionPointPlaneModelPair>();
 
         // Perform plane fitting with the latest available point cloud data.
         // touch location
         IntersectionPointPlaneModelPair touchLocationPlane =
-                TangoSupport.fitPlaneModelNearClick(xyzIj, mIntrinsics,
-                        colorTdepthPose, u, v);
+                TangoSupport.fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, u, v);
 
-        for (float horizontal = 0.1f; horizontal < 1f; horizontal = horizontal + 0.1f) {
-            for (float vertical = 0.2f; vertical < 1f; vertical = vertical + 0.2f) {
-                intersectionPointPlaneModelPairs.add(
-                        TangoSupport.fitPlaneModelNearClick(xyzIj, mIntrinsics,
-                                colorTdepthPose, horizontal, vertical));
-            }
-        }
-
-        intersectionPointPlaneModelPairs = removeOutliers(touchLocationPlane, intersectionPointPlaneModelPairs);
-        intersectionPointPlaneModelPairs.add(touchLocationPlane);
-        IntersectionPointPlaneModelPair average = averagePlaneModel(intersectionPointPlaneModelPairs);
+        IntersectionPointPlaneModelPair average =
+                getAverageIntersectionPointPlaneModelPairFromEnvironment(xyzIj, colorTdepthPose,
+                        touchLocationPlane, 50);
 
         Log.d(TAG, "Correction:");
         Log.d(TAG, String.valueOf(getDifference(average, touchLocationPlane)));
         // Get the device pose at the time the plane data was acquired.
-        TangoPoseData devicePose =
-                mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
+        TangoPoseData devicePose = mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
 
 
         // Update the AR object location.
-        TangoPoseData planeFitPose = calculatePlanePose(
-                average.intersectionPoint,
-                average.planeModel, devicePose);
+        TangoPoseData planeFitPose =
+                calculatePlanePose(average.intersectionPoint, average.planeModel, devicePose);
 
         return new WallMeasurement(planeFitPose, devicePose);
     }
 
-    private double getDifference(IntersectionPointPlaneModelPair left, IntersectionPointPlaneModelPair right) {
+    /**
+     * This method returns an {@link IntersectionPointPlaneModelPair} that is based on the
+     * originally touched point, but also takes its environment into account. It will additionally
+     * consider <code>accuracy</code> number of points and tries to fit an average plane for which
+     * only the ones closer than 5% to the original one are considered.
+     *
+     * @param xyzIj
+     *         required to create planes
+     * @param colorTdepthPose
+     *         required to create planes
+     * @param original
+     *         original plane at touch point
+     * @param accuracy
+     *         number of additional points considered
+     * @return
+     */
+    private IntersectionPointPlaneModelPair
+    getAverageIntersectionPointPlaneModelPairFromEnvironment(
+            TangoXyzIjData xyzIj, TangoPoseData colorTdepthPose,
+            IntersectionPointPlaneModelPair original, int accuracy) {
+
+        List<IntersectionPointPlaneModelPair> candidates =
+                new ArrayList<IntersectionPointPlaneModelPair>();
+
+        // TODO consider orientation
+        float hstep = 1f / (accuracy * 0.625f);
+        float vstep = 1f / (accuracy * 0.375f);
+
+        for (float horizontal = hstep; horizontal < 1f; horizontal = horizontal + hstep) {
+            for (float vertical = vstep; vertical < 1f; vertical = vertical + vstep) {
+                candidates.add(TangoSupport
+                        .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, horizontal,
+                                vertical));
+            }
+        }
+
+        candidates = removeOutliers(original, candidates);
+        candidates.add(original);
+        return averagePlaneModel(candidates);
+    }
+
+    private double getDifference(IntersectionPointPlaneModelPair left,
+                                 IntersectionPointPlaneModelPair right) {
+
         double result = 0;
         for (int i = 0; i < 4; i++) {
             result += Math.abs(left.planeModel[i] - right.planeModel[i]);
@@ -458,7 +487,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         return result;
     }
 
-    private IntersectionPointPlaneModelPair averagePlaneModel(List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+    private IntersectionPointPlaneModelPair averagePlaneModel(
+            List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+
         double[] planeModel = new double[4];
         for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
             for (int i = 0; i < 4; i++) {
@@ -468,7 +499,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         for (int i = 0; i < 4; i++) {
             planeModel[i] = planeModel[i] / intersectionPointPlaneModelPairs.size();
         }
-        double[] intersectionPoint = intersectionPointPlaneModelPairs.get(intersectionPointPlaneModelPairs.size() - 1).intersectionPoint;
+        double[] intersectionPoint = intersectionPointPlaneModelPairs
+                .get(intersectionPointPlaneModelPairs.size() - 1).intersectionPoint;
         return new TangoSupport.IntersectionPointPlaneModelPair(intersectionPoint, planeModel);
     }
 
@@ -479,7 +511,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         Log.d(TAG, getPrettyString(original));
         Log.d(TAG, "Removing outliers");
 
-        List<IntersectionPointPlaneModelPair> result = new ArrayList<IntersectionPointPlaneModelPair>();
+        List<IntersectionPointPlaneModelPair> result =
+                new ArrayList<IntersectionPointPlaneModelPair>();
         for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
             Log.d(TAG, getPrettyString(each));
             if (closeTo(original, each)) {
@@ -489,7 +522,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         return result;
     }
 
-    private boolean closeTo(IntersectionPointPlaneModelPair original, IntersectionPointPlaneModelPair other) {
+    private boolean closeTo(IntersectionPointPlaneModelPair original,
+                            IntersectionPointPlaneModelPair other) {
         for (int i = 0; i < original.planeModel.length; i++) {
             double proportion = original.planeModel[i] / other.planeModel[i];
             if (proportion < 0.95 || proportion > 1.05) {
@@ -523,8 +557,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     /**
-     * Calculate the pose of the plane based on the position and normal orientation of the plane
-     * and align it with gravity.
+     * Calculate the pose of the plane based on the position and normal orientation of the plane and
+     * align it with gravity.
      */
     private TangoPoseData calculatePlanePose(double[] point, double normal[],
                                              TangoPoseData devicePose) {
@@ -553,7 +587,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     /**
      * Builds the plan from the set of measurements and updates the rendering in AR.
      *
-     * @param closed If true, close the floor plan; if false, continue the floor plan.
+     * @param closed
+     *         If true, close the floor plan; if false, continue the floor plan.
      */
     public void buildPlan(boolean closed) {
         mFloorplan = PlanBuilder.buildPlan(mWallMeasurementList, closed);
@@ -567,16 +602,16 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     public void updateMeasurements() {
         for (WallMeasurement wallMeasurement : mWallMeasurementList) {
             // We need to re query the device pose when the measurements were taken.
-            TangoPoseData newDevicePose = mTango.getPoseAtTime(
-                    wallMeasurement.getDevicePoseTimeStamp(), FRAME_PAIR);
+            TangoPoseData newDevicePose =
+                    mTango.getPoseAtTime(wallMeasurement.getDevicePoseTimeStamp(), FRAME_PAIR);
             wallMeasurement.update(newDevicePose);
             mRenderer.addWallMeasurement(wallMeasurement);
         }
     }
 
     /**
-     * Finish plan, save the adf, and show the final result.
-     * Executed as an AsyncTask because saving the adf could be an expensive operation.
+     * Finish plan, save the adf, and show the final result. Executed as an AsyncTask because saving
+     * the adf could be an expensive operation.
      */
     private void finishPlan() {
         if (mFinishPlanTask != null) {
@@ -589,9 +624,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     /**
-     * Finish plan AsyncTask.
-     * Shows a spinner while it's saving the adf and updating the measurements.
-     * Draws the final result on a canvas and shows it.
+     * Finish plan AsyncTask. Shows a spinner while it's saving the adf and updating the
+     * measurements. Draws the final result on a canvas and shows it.
      */
     private class FinishPlanTask extends AsyncTask<Void, Integer, Void> {
 
@@ -617,9 +651,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             mProgressGroup.setVisibility(View.GONE);
             // Draw final result on Canvas.
             PlanView planView = new PlanView(FloorplanActivity.this);
-            planView.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT));
+            planView.setLayoutParams(
+                    new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.MATCH_PARENT));
             setContentView(planView);
             planView.invalidate();
             mFinishPlanTask = null;
