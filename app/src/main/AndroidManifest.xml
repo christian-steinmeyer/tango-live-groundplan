@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.projecttango.examples.java.floorplan"
-    android:versionCode="0"
-    android:versionName="0" >
+          package="com.projecttango.examples.java.floorplan"
+          android:versionCode="1"
+          android:versionName="1.0">
 
-    <uses-sdk
-        android:minSdkVersion="17"
-        android:targetSdkVersion="19" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-library
-        android:name="com.projecttango.libtango_device"
+        android:name="com.projecttango.libtango_device2"
         android:required="true" />
 
     <application

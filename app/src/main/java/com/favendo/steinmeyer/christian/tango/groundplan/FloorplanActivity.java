@@ -55,6 +55,7 @@ import org.rajawali3d.surface.RajawaliSurfaceView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -63,21 +64,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * the user clicks on the display, plane detection is done on the surface at the location of the
  * click and a 3D object will be placed in the scene anchored at that location. A {@code
  * WallMeasurement} will be recorded for that plane.
- * <p/>
+ * <p>
  * You need to take exactly one measurement per wall in clockwise order. As you take measurements,
  * the perimeter of the floor plan will be displayed as lines in AR. After you have taken all the
  * measurements you can press the 'Done' button and the final result will be drawn in 2D as seen
  * from above along with labels showing the sizes of the walls.
- * <p/>
+ * <p>
  * You are going to be building an ADF as you take the measurements. After pressing the 'Done'
  * button the ADF will be saved and an optimization will be run on it. After that, all the recorded
  * measurements are re-queried and the floor plan will be rebuilt in order to have better
  * precision.
- * <p/>
+ * <p>
  * Note that it is important to include the KEY_BOOLEAN_LOWLATENCYIMUINTEGRATION configuration
  * parameter in order to achieve the best results synchronizing the Rajawali virtual world with the
  * RGB camera.
- * <p/>
+ * <p>
  * For more details on the augmented reality effects, including color camera texture rendering, see
  * java_augmented_reality_example or java_hello_video_example.
  */
@@ -88,7 +89,20 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     private static final TangoCoordinateFramePair FRAME_PAIR =
             new TangoCoordinateFramePair(TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION,
                     TangoPoseData.COORDINATE_FRAME_DEVICE);
-    private static final int INVALID_TEXTURE_ID = -1;
+    private static final int INVALID_TEXTURE_ID = 0;
+
+    // Configure the Tango coordinate frame pair
+    private static final ArrayList<TangoCoordinateFramePair> FRAME_PAIRS =
+            new ArrayList<TangoCoordinateFramePair>();
+
+    {
+        FRAME_PAIRS
+                .add(new TangoCoordinateFramePair(TangoPoseData.COORDINATE_FRAME_START_OF_SERVICE,
+                        TangoPoseData.COORDINATE_FRAME_DEVICE));
+    }
+
+    private TangoPoseData mPose;
+
 
     private RajawaliSurfaceView mSurfaceView;
     private FloorplanRenderer mRenderer;
@@ -96,7 +110,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     private DeviceExtrinsics mExtrinsics;
     private TangoPointCloudManager mPointCloudManager;
     private Tango mTango;
-    private AtomicBoolean mIsConnected = new AtomicBoolean(false);
+    private boolean mIsConnected = false;
     private double mCameraPoseTimestamp = 0;
     private List<WallMeasurement> mWallMeasurementList;
     private Floorplan mFloorplan;
@@ -122,7 +136,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         // Set ZOrderOnTop to false so the other views don't get hidden by the SurfaceView.
         mSurfaceView.setZOrderOnTop(false);
         mProgressGroup = (ViewGroup) findViewById(R.id.progress_group);
-        mTango = new Tango(this);
         mPointCloudManager = new TangoPointCloudManager();
         mWallMeasurementList = new ArrayList<WallMeasurement>();
         mDoneButton = (Button) findViewById(R.id.done_button);
@@ -140,13 +153,14 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         // Synchronize against disconnecting while the service is being used in the OpenGL thread or
         // in the UI thread.
         synchronized (this) {
-            if (mIsConnected.compareAndSet(true, false)) {
+            if (mIsConnected) {
                 mRenderer.getCurrentScene().clearFrameCallbacks();
                 mTango.disconnectCamera(TangoCameraIntrinsics.TANGO_CAMERA_COLOR);
                 // We need to invalidate the connected texture ID so that we cause a re-connection
                 // in the OpenGL thread after resume
                 mConnectedTextureIdGlThread = INVALID_TEXTURE_ID;
                 mTango.disconnect();
+                mIsConnected = false;
             }
         }
     }
@@ -174,8 +188,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 Toast.makeText(this, "Area Learning Permissions Required!", Toast.LENGTH_SHORT)
                         .show();
                 finish();
-            } else {
-                connectAndStart();
             }
         }
     }
@@ -187,14 +199,26 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         // Synchronize against disconnecting while the service is being used in the OpenGL thread or
         // in the UI thread.
         synchronized (this) {
-            if (mIsConnected.compareAndSet(false, true)) {
-                try {
-                    connectTango();
-                    connectRenderer();
-                } catch (TangoOutOfDateException e) {
-                    Toast.makeText(getApplicationContext(), R.string.exception_out_of_date,
-                            Toast.LENGTH_SHORT).show();
-                }
+            if (!mIsConnected) {
+                // Initialize Tango Service as a normal Android Service, since we call
+                // mTango.disconnect() in onPause, this will unbind Tango Service, so
+                // everytime when onResume get called, we should create a new Tango object.
+                mTango = new Tango(FloorplanActivity.this, new Runnable() {
+                    // Pass in a Runnable to be called from UI thread when Tango is ready,
+                    // this Runnable will be running on a new thread.
+                    // When Tango is ready, we can call Tango functions safely here only
+                    // when there is no UI thread changes involved.
+                    @Override
+                    public void run() {
+                        try {
+                            connectTango();
+                            connectRenderer();
+                            mIsConnected = true;
+                        } catch (TangoOutOfDateException e) {
+                            Log.e(TAG, getString(R.string.exception_out_of_date), e);
+                        }
+                    }
+                });
             }
         }
     }
@@ -221,7 +245,11 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         mTango.connectListener(framePairs, new OnTangoUpdateListener() {
             @Override
             public void onPoseAvailable(TangoPoseData pose) {
-                // We are not using OnPoseAvailable for this app.
+                // Update our copy of the latest pose
+                // Synchronize against concurrent use in the render loop.
+                synchronized (this) {
+                    mPose = pose;
+                }
             }
 
             @Override
@@ -271,7 +299,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 // callback thread and service disconnection from an onPause event.
                 synchronized (FloorplanActivity.this) {
                     // Don't execute any tango API actions if we're not connected to the service
-                    if (!mIsConnected.get()) {
+                    if (!mIsConnected) {
                         return;
                     }
 
@@ -307,6 +335,21 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                             mCameraPoseTimestamp = lastFramePose.timestamp;
                         } else {
                             Log.w(TAG, "Can't get device pose at time: " + mRgbTimestampGlThread);
+                        }
+                    }
+
+                    // Update point cloud data
+                    TangoXyzIjData pointCloud = mPointCloudManager.getLatestXyzIj();
+                    if (pointCloud != null) {
+                        TangoPoseData pointCloudPose =
+                                mTango.getPoseAtTime(pointCloud.timestamp, FRAME_PAIRS.get(0));
+                        mRenderer.updatePointCloud(pointCloud, pointCloudPose, mExtrinsics);
+                    }
+
+                    // Update current device pose
+                    synchronized (this) {
+                        if (mPose != null) {
+                            mRenderer.updateDevicePose(mPose, mExtrinsics);
                         }
                     }
                 }
@@ -421,7 +464,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         IntersectionPointPlaneModelPair average =
                 getAverageIntersectionPointPlaneModelPairFromEnvironment(xyzIj, colorTdepthPose,
-                        touchLocationPlane, 50);
+                        touchLocationPlane, 4);
 
         Log.d(TAG, "Correction:");
         Log.d(TAG, String.valueOf(getDifference(average, touchLocationPlane)));
@@ -450,7 +493,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      *         original plane at touch point
      * @param accuracy
      *         number of additional points considered
-     * @return
+     * @return average of all input information
      */
     private IntersectionPointPlaneModelPair
     getAverageIntersectionPointPlaneModelPairFromEnvironment(
@@ -539,7 +582,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         result += "IP(";
         for (double each : pair.intersectionPoint) {
-            result += each > 0 ? " " + String.format("%.3f", each) : String.format("%.3f", each);
+            result += each > 0 ? " " + String.format(Locale.GERMANY, "%.3f", each) :
+                    String.format(Locale.GERMANY, "%.3f", each);
             result += "|";
         }
         result = result.substring(0, result.length() - 2);
@@ -547,7 +591,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         result += " PM(";
         for (double each : pair.planeModel) {
-            result += each > 0 ? " " + String.format("%.3f", each) : String.format("%.3f", each);
+            result += each > 0 ? " " + String.format(Locale.GERMANY, "%.3f", each) :
+                    String.format(Locale.GERMANY, "%.3f", each);
             result += "|";
         }
         result = result.substring(0, result.length() - 2);

@@ -15,13 +15,22 @@
  */
 package com.favendo.steinmeyer.christian.tango.groundplan;
 
-import com.google.atap.tangoservice.TangoCameraIntrinsics;
-import com.google.atap.tangoservice.TangoPoseData;
-
 import android.content.Context;
 import android.graphics.Color;
 import android.util.Log;
 import android.view.MotionEvent;
+
+import com.google.atap.tangoservice.TangoCameraIntrinsics;
+import com.google.atap.tangoservice.TangoPoseData;
+import com.google.atap.tangoservice.TangoXyzIjData;
+import com.projecttango.examples.java.floorplan.R;
+import com.projecttango.rajawali.DeviceExtrinsics;
+import com.projecttango.rajawali.Pose;
+import com.projecttango.rajawali.ScenePoseCalculator;
+import com.projecttango.rajawali.TouchViewHandler;
+import com.projecttango.rajawali.renderables.FrustumAxes;
+import com.projecttango.rajawali.renderables.PointCloud;
+import com.projecttango.tangosupport.TangoSupport;
 
 import org.rajawali3d.Object3D;
 import org.rajawali3d.lights.DirectionalLight;
@@ -39,18 +48,13 @@ import org.rajawali3d.primitives.Plane;
 import org.rajawali3d.primitives.ScreenQuad;
 import org.rajawali3d.renderer.RajawaliRenderer;
 
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Stack;
 
 import javax.microedition.khronos.opengles.GL10;
-
-import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.Pose;
-import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.tangosupport.TangoSupport;
-
 
 /**
  * Very simple augmented reality example which displays cubes fixed in place for every
@@ -59,7 +63,7 @@ import com.projecttango.tangosupport.TangoSupport;
  * using the point cloud data at the position clicked.
  */
 public class FloorplanRenderer extends RajawaliRenderer {
-    private static final float CUBE_SIDE_LENGTH = 0.3f;
+    private static final float CUBE_SIDE_LENGTH = 1f;
     private static final String TAG = FloorplanRenderer.class.getSimpleName();
 
     private List<Pose> mNewPoseList = new ArrayList<Pose>();
@@ -70,12 +74,21 @@ public class FloorplanRenderer extends RajawaliRenderer {
     private Stack<Vector3> mPlanPoints;
     private List<Object3D> mMeasurementObjectList = new ArrayList<Object3D>();
 
+    private TouchViewHandler mTouchViewHandler;
+    private PointCloud mPointCloud;
+    private static final int MAX_NUMBER_OF_POINTS = 60000;
+    private FrustumAxes mFrustumAxes;
+
+
+
+
     // Augmented reality related fields
     private ATexture mTangoCameraTexture;
     private boolean mSceneCameraConfigured;
 
     public FloorplanRenderer(Context context) {
         super(context);
+        mTouchViewHandler = new TouchViewHandler(mContext, getCurrentCamera());
     }
 
     @Override
@@ -96,6 +109,12 @@ public class FloorplanRenderer extends RajawaliRenderer {
             Log.e(TAG, "Exception creating texture for RGB camera contents", e);
         }
         getCurrentScene().addChildAt(backgroundQuad, 0);
+
+
+        mFrustumAxes = new FrustumAxes(3);
+        getCurrentScene().addChild(mFrustumAxes);
+        mPointCloud = new PointCloud(MAX_NUMBER_OF_POINTS);
+        getCurrentScene().addChild(mPointCloud);
 
         // Add a directional light in an arbitrary direction.
         DirectionalLight light = new DirectionalLight(1, 0.2, -1);
@@ -166,6 +185,48 @@ public class FloorplanRenderer extends RajawaliRenderer {
 
         super.onRender(elapsedRealTime, deltaTime);
     }
+
+    /**
+     * Updates the rendered point cloud. For this, we need the point cloud data and the device pose
+     * at the time the cloud data was acquired.
+     * NOTE: This needs to be called from the OpenGL rendering thread.
+     */
+    public void updatePointCloud(TangoXyzIjData xyzIjData, TangoPoseData devicePose,
+                                 DeviceExtrinsics extrinsics) {
+        FloatBuffer adjustedXyz = removeAnythingButWalls(xyzIjData.xyz);
+        int adjustedXyzCount = adjustedXyz.capacity() / 3;
+        Pose pointCloudPose = ScenePoseCalculator.toDepthCameraOpenGlPose(devicePose, extrinsics);
+        mPointCloud.updateCloud(adjustedXyzCount, adjustedXyz);
+        mPointCloud.setPosition(pointCloudPose.getPosition());
+        mPointCloud.setOrientation(pointCloudPose.getOrientation());
+    }
+
+    private FloatBuffer removeAnythingButWalls(FloatBuffer xyz) {
+        List<Float> result = new ArrayList<Float>();
+        for (int i = 0; i < xyz.capacity() - 3; i = i + 3) {
+            // TODO if in wall
+            result.add(xyz.get(i));
+            result.add(xyz.get(i + 1));
+            result.add(xyz.get(i + 2));
+        }
+        float[] resultPrimitive = new float[result.size()];
+        for (int i = 0; i < result.size(); i++) {
+            resultPrimitive[i] = result.get(i);
+        }
+        return FloatBuffer.wrap(resultPrimitive);
+    }
+
+    /**
+     * Updates our information about the current device pose. NOTE: This needs to be called from the
+     * OpenGL rendering thread.
+     */
+    public void updateDevicePose(TangoPoseData tangoPoseData, DeviceExtrinsics extrinsics) {
+        Pose cameraPose = ScenePoseCalculator.toOpenGlCameraPose(tangoPoseData, extrinsics);
+        mFrustumAxes.setPosition(cameraPose.getPosition());
+        mFrustumAxes.setOrientation(cameraPose.getOrientation());
+        mTouchViewHandler.updateCamera(cameraPose.getPosition(), cameraPose.getOrientation());
+    }
+
 
     /**
      * Update the scene camera based on the provided pose in Tango start of service frame.
@@ -245,6 +306,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
         float[] translation = openGLPose.getTranslationAsFloats();
         mNewPoseList.add(new Pose(new Vector3(translation[0], translation[1], translation[2]),
                 new Quaternion(rotation[3], rotation[0], rotation[1], rotation[2])));
+        Log.d(TAG, mNewPoseList.get(mNewPoseList.size() - 1).toString());
         mObjectPoseUpdated = true;
     }
 
