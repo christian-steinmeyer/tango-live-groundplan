@@ -16,6 +16,17 @@
 
 package com.favendo.steinmeyer.christian.tango.groundplan;
 
+import com.google.atap.tangoservice.Tango;
+import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
+import com.google.atap.tangoservice.TangoCameraIntrinsics;
+import com.google.atap.tangoservice.TangoConfig;
+import com.google.atap.tangoservice.TangoCoordinateFramePair;
+import com.google.atap.tangoservice.TangoEvent;
+import com.google.atap.tangoservice.TangoException;
+import com.google.atap.tangoservice.TangoOutOfDateException;
+import com.google.atap.tangoservice.TangoPoseData;
+import com.google.atap.tangoservice.TangoXyzIjData;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -31,32 +42,22 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-import com.google.atap.tangoservice.Tango;
-import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
-import com.google.atap.tangoservice.TangoCameraIntrinsics;
-import com.google.atap.tangoservice.TangoConfig;
-import com.google.atap.tangoservice.TangoCoordinateFramePair;
-import com.google.atap.tangoservice.TangoEvent;
-import com.google.atap.tangoservice.TangoException;
-import com.google.atap.tangoservice.TangoOutOfDateException;
-import com.google.atap.tangoservice.TangoPoseData;
-import com.google.atap.tangoservice.TangoXyzIjData;
-import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.DeviceExtrinsics;
-import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.tangosupport.TangoPointCloudManager;
-import com.projecttango.tangosupport.TangoSupport;
-import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
-
 import org.rajawali3d.math.Matrix4;
+import org.rajawali3d.math.Quaternion;
 import org.rajawali3d.math.vector.Vector3;
 import org.rajawali3d.scene.ASceneFrameCallback;
 import org.rajawali3d.surface.RajawaliSurfaceView;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import com.projecttango.examples.java.floorplan.R;
+import com.projecttango.rajawali.DeviceExtrinsics;
+import com.projecttango.rajawali.ScenePoseCalculator;
+import com.projecttango.tangosupport.TangoPointCloudManager;
+import com.projecttango.tangosupport.TangoSupport;
+import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
 
 /**
  * An example showing how to build a very simple application that allows the user to create a floor
@@ -91,19 +92,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                     TangoPoseData.COORDINATE_FRAME_DEVICE);
     private static final int INVALID_TEXTURE_ID = 0;
 
-    // Configure the Tango coordinate frame pair
-    private static final ArrayList<TangoCoordinateFramePair> FRAME_PAIRS =
-            new ArrayList<TangoCoordinateFramePair>();
-
-    {
-        FRAME_PAIRS
-                .add(new TangoCoordinateFramePair(TangoPoseData.COORDINATE_FRAME_START_OF_SERVICE,
-                        TangoPoseData.COORDINATE_FRAME_DEVICE));
-    }
-
-    private TangoPoseData mPose;
-
-
     private RajawaliSurfaceView mSurfaceView;
     private FloorplanRenderer mRenderer;
     private TangoCameraIntrinsics mIntrinsics;
@@ -123,6 +111,12 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     private int mConnectedTextureIdGlThread = INVALID_TEXTURE_ID;
     private AtomicBoolean mIsFrameAvailableTangoThread = new AtomicBoolean(false);
     private double mRgbTimestampGlThread;
+
+    // Time
+    private static final int SECS_TO_MILLISECS = 1000;
+    private double mXyIjPreviousTimeStamp;
+    private static final double UPDATE_INTERVAL_MS = 500.0;
+    private double mXyzIjTimeToNextUpdate = UPDATE_INTERVAL_MS;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -245,11 +239,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         mTango.connectListener(framePairs, new OnTangoUpdateListener() {
             @Override
             public void onPoseAvailable(TangoPoseData pose) {
-                // Update our copy of the latest pose
-                // Synchronize against concurrent use in the render loop.
-                synchronized (this) {
-                    mPose = pose;
-                }
+                // We are not using OnPoseAvailable for this app.
             }
 
             @Override
@@ -267,6 +257,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             public void onXyzIjAvailable(TangoXyzIjData xyzIj) {
                 // Save the cloud and point data for later use.
                 mPointCloudManager.updateXyzIj(xyzIj);
+                measureForWalls();
             }
 
             @Override
@@ -279,6 +270,15 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         // to be done after connecting Tango and listeners.
         mExtrinsics = setupExtrinsics(mTango);
         mIntrinsics = mTango.getCameraIntrinsics(TangoCameraIntrinsics.TANGO_CAMERA_COLOR);
+    }
+
+    private void calculateMxyzijTimeToNextUpdate(TangoXyzIjData xyzIj) {
+        final double currentTimeStamp = xyzIj.timestamp;
+        final double pointCloudFrameDelta =
+                (currentTimeStamp - mXyIjPreviousTimeStamp) * SECS_TO_MILLISECS;
+        mXyIjPreviousTimeStamp = currentTimeStamp;
+
+        mXyzIjTimeToNextUpdate -= pointCloudFrameDelta;
     }
 
     /**
@@ -337,21 +337,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                             Log.w(TAG, "Can't get device pose at time: " + mRgbTimestampGlThread);
                         }
                     }
-
-                    // Update point cloud data
-                    TangoXyzIjData pointCloud = mPointCloudManager.getLatestXyzIj();
-                    if (pointCloud != null) {
-                        TangoPoseData pointCloudPose =
-                                mTango.getPoseAtTime(pointCloud.timestamp, FRAME_PAIRS.get(0));
-                        mRenderer.updatePointCloud(pointCloud, pointCloudPose, mExtrinsics);
-                    }
-
-                    // Update current device pose
-                    synchronized (this) {
-                        if (mPose != null) {
-                            mRenderer.updateDevicePose(mPose, mExtrinsics);
-                        }
-                    }
                 }
             }
 
@@ -402,36 +387,63 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     @Override
     public boolean onTouch(View view, MotionEvent motionEvent) {
         if (motionEvent.getAction() == MotionEvent.ACTION_UP) {
-            // Calculate click location in u,v (0;1) coordinates.
-            float u = motionEvent.getX() / view.getWidth();
-            float v = motionEvent.getY() / view.getHeight();
+//            measureForWalls();
+        }
+        return true;
+    }
 
-            try {
-                // Take a wall measurement by fitting a plane on the clicked point using the latest
-                // point cloud data.
-                // Synchronize against concurrent access to the RGB timestamp in the OpenGL thread
-                // and a possible service disconnection due to an onPause event.
-                WallMeasurement wallMeasurement;
-                synchronized (this) {
-                    wallMeasurement = doWallMeasurement(u, v, mRgbTimestampGlThread);
-                }
+    private void measureForWalls() {
+        try {
+            // Synchronize against concurrent access to the RGB timestamp in the
+            // OpenGL thread and a possible service disconnection due to an onPause
+            // event.
+            WallMeasurement wallMeasurement;
+            synchronized (this) {
+                wallMeasurement = doWallMeasurement(mRgbTimestampGlThread);
+            }
 
-                // If the measurement was successful add it and run the floor plan building
-                // algorithm.
-                if (wallMeasurement != null) {
+            // If the measurement was successful add it and run the floor plan building
+            // algorithm.
+            if (wallMeasurement != null) {
+                if (isNewWall(wallMeasurement)) {
                     mWallMeasurementList.add(wallMeasurement);
                     mRenderer.addWallMeasurement(wallMeasurement);
                     buildPlan(false);
                 }
+            }
+        } catch (TangoException t) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(getApplicationContext(), R.string.failed_measurement,
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
 
-            } catch (TangoException t) {
-                Toast.makeText(getApplicationContext(), R.string.failed_measurement,
-                        Toast.LENGTH_SHORT).show();
-                Log.e(TAG, getString(R.string.failed_measurement), t);
-            } catch (SecurityException t) {
-                Toast.makeText(getApplicationContext(), R.string.failed_permissions,
-                        Toast.LENGTH_SHORT).show();
-                Log.e(TAG, getString(R.string.failed_permissions), t);
+            Log.e(TAG, getString(R.string.failed_measurement), t);
+        } catch (SecurityException t) {
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(getApplicationContext(), R.string.failed_permissions,
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            Log.e(TAG, getString(R.string.failed_permissions), t);
+        }
+    }
+
+    private boolean isNewWall(WallMeasurement newWall) {
+        for (WallMeasurement wall : mWallMeasurementList) {
+            double[] o = wall.getPlanePose().rotation;
+            Quaternion wallOrientation = new Quaternion(o[0], o[1], o[2], o[3]);
+            double[] o2 = newWall.getPlanePose().rotation;
+            Quaternion newWallOrientation = new Quaternion(o2[0], o2[1], o2[2], o2[3]);
+            double angle = wallOrientation.angleBetween(newWallOrientation);
+            if (angle < 0.05) {
+                return false;
             }
         }
         return true;
@@ -442,7 +454,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * location in the color camera frame. It returns the pose of the fitted plane in a
      * TangoPoseData structure.
      */
-    private WallMeasurement doWallMeasurement(float u, float v, double rgbTimestamp) {
+    private WallMeasurement doWallMeasurement(double rgbTimestamp) {
         TangoXyzIjData xyzIj = mPointCloudManager.getLatestXyzIj();
 
         if (xyzIj == null) {
@@ -457,17 +469,10 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                         xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
 
 
-        // Perform plane fitting with the latest available point cloud data.
-        // touch location
-        IntersectionPointPlaneModelPair touchLocationPlane =
-                TangoSupport.fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, u, v);
-
         IntersectionPointPlaneModelPair average =
-                getAverageIntersectionPointPlaneModelPairFromEnvironment(xyzIj, colorTdepthPose,
-                        touchLocationPlane, 4);
+                getAverageIntersectionPointPlaneModelPairFromEnvironment(xyzIj, colorTdepthPose, 2,
+                        2);
 
-        Log.d(TAG, "Correction:");
-        Log.d(TAG, String.valueOf(getDifference(average, touchLocationPlane)));
         // Get the device pose at the time the plane data was acquired.
         TangoPoseData devicePose = mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
 
@@ -489,45 +494,32 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      *         required to create planes
      * @param colorTdepthPose
      *         required to create planes
-     * @param original
-     *         original plane at touch point
-     * @param accuracy
-     *         number of additional points considered
+     * @param hNum
+     *         number of horizontal measure points (in one line)
+     * @param vNum
+     *         number of vertical measure points (in one column)
      * @return average of all input information
      */
     private IntersectionPointPlaneModelPair
     getAverageIntersectionPointPlaneModelPairFromEnvironment(
-            TangoXyzIjData xyzIj, TangoPoseData colorTdepthPose,
-            IntersectionPointPlaneModelPair original, int accuracy) {
+            TangoXyzIjData xyzIj, TangoPoseData colorTdepthPose, float hNum, float vNum) {
 
         List<IntersectionPointPlaneModelPair> candidates =
                 new ArrayList<IntersectionPointPlaneModelPair>();
 
-        // TODO consider orientation
-        float hstep = 1f / (accuracy * 0.625f);
-        float vstep = 1f / (accuracy * 0.375f);
+        float hStep = 1 / hNum;
+        float vStep = 1 / vNum;
 
-        for (float horizontal = hstep; horizontal < 1f; horizontal = horizontal + hstep) {
-            for (float vertical = vstep; vertical < 1f; vertical = vertical + vstep) {
+        // TODO consider orientation
+        for (float horizontal = hStep; horizontal < 1f; horizontal += hStep) {
+            for (float vertical = vStep; vertical < 1f; vertical += vStep) {
                 candidates.add(TangoSupport
                         .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, horizontal,
                                 vertical));
             }
         }
 
-        candidates = removeOutliers(original, candidates);
-        candidates.add(original);
         return averagePlaneModel(candidates);
-    }
-
-    private double getDifference(IntersectionPointPlaneModelPair left,
-                                 IntersectionPointPlaneModelPair right) {
-
-        double result = 0;
-        for (int i = 0; i < 4; i++) {
-            result += Math.abs(left.planeModel[i] - right.planeModel[i]);
-        }
-        return result;
     }
 
     private IntersectionPointPlaneModelPair averagePlaneModel(
@@ -545,60 +537,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         double[] intersectionPoint = intersectionPointPlaneModelPairs
                 .get(intersectionPointPlaneModelPairs.size() - 1).intersectionPoint;
         return new TangoSupport.IntersectionPointPlaneModelPair(intersectionPoint, planeModel);
-    }
-
-    private List<IntersectionPointPlaneModelPair> removeOutliers(
-            IntersectionPointPlaneModelPair original,
-            List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
-        Log.d(TAG, "Touch Location:");
-        Log.d(TAG, getPrettyString(original));
-        Log.d(TAG, "Removing outliers");
-
-        List<IntersectionPointPlaneModelPair> result =
-                new ArrayList<IntersectionPointPlaneModelPair>();
-        for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
-            Log.d(TAG, getPrettyString(each));
-            if (closeTo(original, each)) {
-                result.add(each);
-            }
-        }
-        return result;
-    }
-
-    private boolean closeTo(IntersectionPointPlaneModelPair original,
-                            IntersectionPointPlaneModelPair other) {
-        for (int i = 0; i < original.planeModel.length; i++) {
-            double proportion = original.planeModel[i] / other.planeModel[i];
-            if (proportion < 0.95 || proportion > 1.05) {
-                Log.d(TAG, "\tremoved: " + proportion);
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private String getPrettyString(IntersectionPointPlaneModelPair pair) {
-        String result = "[";
-
-        result += "IP(";
-        for (double each : pair.intersectionPoint) {
-            result += each > 0 ? " " + String.format(Locale.GERMANY, "%.3f", each) :
-                    String.format(Locale.GERMANY, "%.3f", each);
-            result += "|";
-        }
-        result = result.substring(0, result.length() - 2);
-        result += ")";
-
-        result += " PM(";
-        for (double each : pair.planeModel) {
-            result += each > 0 ? " " + String.format(Locale.GERMANY, "%.3f", each) :
-                    String.format(Locale.GERMANY, "%.3f", each);
-            result += "|";
-        }
-        result = result.substring(0, result.length() - 2);
-        result += ")";
-
-        return result + "]";
     }
 
     /**
