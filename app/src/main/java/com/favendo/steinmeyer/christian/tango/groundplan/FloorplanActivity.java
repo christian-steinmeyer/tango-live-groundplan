@@ -65,21 +65,21 @@ import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPai
  * the user clicks on the display, plane detection is done on the surface at the location of the
  * click and a 3D object will be placed in the scene anchored at that location. A {@code
  * WallMeasurement} will be recorded for that plane.
- * <p>
+ * <p/>
  * You need to take exactly one measurement per wall in clockwise order. As you take measurements,
  * the perimeter of the floor plan will be displayed as lines in AR. After you have taken all the
  * measurements you can press the 'Done' button and the final result will be drawn in 2D as seen
  * from above along with labels showing the sizes of the walls.
- * <p>
+ * <p/>
  * You are going to be building an ADF as you take the measurements. After pressing the 'Done'
  * button the ADF will be saved and an optimization will be run on it. After that, all the recorded
  * measurements are re-queried and the floor plan will be rebuilt in order to have better
  * precision.
- * <p>
+ * <p/>
  * Note that it is important to include the KEY_BOOLEAN_LOWLATENCYIMUINTEGRATION configuration
  * parameter in order to achieve the best results synchronizing the Rajawali virtual world with the
  * RGB camera.
- * <p>
+ * <p/>
  * For more details on the augmented reality effects, including color camera texture rendering, see
  * java_augmented_reality_example or java_hello_video_example.
  */
@@ -393,60 +393,42 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     private void measureForWalls() {
-        try {
-            // Synchronize against concurrent access to the RGB timestamp in the
-            // OpenGL thread and a possible service disconnection due to an onPause
-            // event.
-            WallMeasurement wallMeasurement;
-            synchronized (this) {
-                wallMeasurement = doWallMeasurement(mRgbTimestampGlThread);
+        // Synchronize against concurrent access to the RGB timestamp in the
+        // OpenGL thread and a possible service disconnection due to an onPause
+        // event.
+        WallMeasurement wallMeasurement;
+        synchronized (this) {
+            wallMeasurement = doWallMeasurement(mRgbTimestampGlThread);
+        }
+
+        // If the measurement was successful add it and run the floor plan building
+        // algorithm.
+        if (wallMeasurement != null) {
+            if (isNewWall(wallMeasurement)) {
+                mWallMeasurementList.add(wallMeasurement);
+                mRenderer.addWallMeasurement(wallMeasurement);
+                buildPlan(false);
             }
-
-            // If the measurement was successful add it and run the floor plan building
-            // algorithm.
-            if (wallMeasurement != null) {
-                if (isNewWall(wallMeasurement)) {
-                    mWallMeasurementList.add(wallMeasurement);
-                    mRenderer.addWallMeasurement(wallMeasurement);
-                    buildPlan(false);
-                }
-            }
-        } catch (TangoException t) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(getApplicationContext(), R.string.failed_measurement,
-                            Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            Log.e(TAG, getString(R.string.failed_measurement), t);
-        } catch (SecurityException t) {
-
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(getApplicationContext(), R.string.failed_permissions,
-                            Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            Log.e(TAG, getString(R.string.failed_permissions), t);
         }
     }
 
     private boolean isNewWall(WallMeasurement newWall) {
         for (WallMeasurement wall : mWallMeasurementList) {
-            double[] o = wall.getPlanePose().rotation;
-            Quaternion wallOrientation = new Quaternion(o[0], o[1], o[2], o[3]);
-            double[] o2 = newWall.getPlanePose().rotation;
-            Quaternion newWallOrientation = new Quaternion(o2[0], o2[1], o2[2], o2[3]);
-            double angle = wallOrientation.angleBetween(newWallOrientation);
+            double angle = getAngle(newWall.getPlanePose().rotation, wall.getPlanePose().rotation);
             if (angle < 0.05) {
                 return false;
             }
         }
         return true;
+    }
+
+    private double getAngle(double[] orientation, double[] other) {
+        Quaternion wallOrientation =
+                new Quaternion(orientation[0], orientation[1], orientation[2], orientation[3]);
+        Quaternion newWallOrientation = new Quaternion(other[0], other[1], other[2], other[3]);
+        wallOrientation.normalize();
+        newWallOrientation.normalize();
+        return wallOrientation.angleBetween(newWallOrientation);
     }
 
     /**
@@ -469,9 +451,11 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                         xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
 
 
-        IntersectionPointPlaneModelPair average =
-                getAverageIntersectionPointPlaneModelPairFromEnvironment(xyzIj, colorTdepthPose, 2,
-                        2);
+        IntersectionPointPlaneModelPair wall =
+                measureWall(xyzIj, colorTdepthPose, 4, 4, 10);
+        if (wall == null) {
+            return null;
+        }
 
         // Get the device pose at the time the plane data was acquired.
         TangoPoseData devicePose = mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
@@ -479,7 +463,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         // Update the AR object location.
         TangoPoseData planeFitPose =
-                calculatePlanePose(average.intersectionPoint, average.planeModel, devicePose);
+                calculatePlanePose(wall.intersectionPoint, wall.planeModel,
+                        devicePose);
 
         return new WallMeasurement(planeFitPose, devicePose);
     }
@@ -494,48 +479,109 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      *         required to create planes
      * @param colorTdepthPose
      *         required to create planes
-     * @param hNum
+     * @param horizontals
      *         number of horizontal measure points (in one line)
-     * @param vNum
+     * @param verticals
      *         number of vertical measure points (in one column)
+     * @param minCommons
+     *         number of common measure points required for positive feedback
      * @return average of all input information
      */
-    private IntersectionPointPlaneModelPair
-    getAverageIntersectionPointPlaneModelPairFromEnvironment(
-            TangoXyzIjData xyzIj, TangoPoseData colorTdepthPose, float hNum, float vNum) {
+    private IntersectionPointPlaneModelPair measureWall(
+            TangoXyzIjData xyzIj, TangoPoseData colorTdepthPose, int horizontals, int verticals,
+            int minCommons) {
 
         List<IntersectionPointPlaneModelPair> candidates =
-                new ArrayList<IntersectionPointPlaneModelPair>();
+                getCandidates(xyzIj, colorTdepthPose, horizontals, verticals);
 
-        float hStep = 1 / hNum;
-        float vStep = 1 / vNum;
-
-        // TODO consider orientation
-        for (float horizontal = hStep; horizontal < 1f; horizontal += hStep) {
-            for (float vertical = vStep; vertical < 1f; vertical += vStep) {
-                candidates.add(TangoSupport
-                        .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, horizontal,
-                                vertical));
-            }
+        List<IntersectionPointPlaneModelPair> winners = removeOutliers(candidates);
+        Log.i(TAG, candidates.size() + " candidates and " + winners.size() + " winners");
+        if (winners.size() < minCommons){
+            return null;
         }
 
-        return averagePlaneModel(candidates);
+        return getAverage(winners);
     }
 
-    private IntersectionPointPlaneModelPair averagePlaneModel(
-            List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+    private List<IntersectionPointPlaneModelPair> getCandidates(TangoXyzIjData xyzIj,
+                                                                TangoPoseData colorTdepthPose,
+                                                                int horizontals, int verticals) {
+        List<IntersectionPointPlaneModelPair> candidates = new ArrayList<>();
 
-        double[] planeModel = new double[4];
-        for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
-            for (int i = 0; i < 4; i++) {
-                planeModel[i] += each.planeModel[i];
+        float hStep = 1f / (horizontals + 1f);
+        float vStep = 1f / (verticals + 1f);
+
+        for (float x = hStep; x < 1f; x += hStep) {
+            for (float y = vStep; y < 1f; y += vStep) {
+                try{
+                    candidates.add(TangoSupport
+                            .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, x, y));
+                } catch (TangoException t) {
+                    Log.e(TAG, getString(R.string.failed_measurement));
+                } catch (SecurityException t) {
+                    Log.e(TAG, getString(R.string.failed_permissions), t);
+                }
             }
         }
-        for (int i = 0; i < 4; i++) {
+        return candidates;
+    }
+
+    private List<IntersectionPointPlaneModelPair> removeOutliers(
+            List<IntersectionPointPlaneModelPair> candidates) {
+        List<IntersectionPointPlaneModelPair> result = new ArrayList<>();
+        boolean [][] candidatePairs = new boolean[candidates.size()][candidates.size()];
+
+        for (int i = 0; i < candidates.size(); i++) {
+            for (int j = i + 1; j < candidates.size(); j++) {
+                if (getAngle(candidates.get(i).planeModel, candidates.get(j).planeModel) < 0.05) {
+                    candidatePairs[i][j] = true;
+                    candidatePairs[j][i] = true;
+                }
+            }
+        }
+
+        int max = 0;
+        int index = -1;
+        for (int i = 0; i < candidates.size(); i++){
+            int pairCount = 0;
+            for (int j = 0; j < candidates.size(); j++){
+                if (candidatePairs[i][j]){
+                    pairCount++;
+                }
+            }
+            index = max < pairCount ? i : index;
+            max = Math.max(max, pairCount);
+        }
+
+        if (index > -1){
+            for (int i = 0; i < candidates.size(); i++){
+                if (candidatePairs[index][i]){
+                    result.add(candidates.get(i));
+                } else {
+                    Log.i(TAG, "Removed outlier: " + candidates.get(i));
+                }
+            }
+        }
+        return result;
+    }
+
+    private IntersectionPointPlaneModelPair getAverage(
+            List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+
+        double[] intersectionPoint = new double[3];
+        double[] planeModel = new double[4];
+        for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
+            for (int i = 0; i < 3; i++){
+                intersectionPoint[i] += each.intersectionPoint[i];
+                planeModel[i] += each.planeModel[i];
+            }
+            planeModel[3] += each.planeModel[3]; // not in own loop due to performance
+        }
+        for (int i = 0; i < 3; i++) {
+            intersectionPoint[i] = intersectionPoint[i] / intersectionPointPlaneModelPairs.size();
             planeModel[i] = planeModel[i] / intersectionPointPlaneModelPairs.size();
         }
-        double[] intersectionPoint = intersectionPointPlaneModelPairs
-                .get(intersectionPointPlaneModelPairs.size() - 1).intersectionPoint;
+        planeModel[3] = planeModel[3] / intersectionPointPlaneModelPairs.size(); // see above
         return new TangoSupport.IntersectionPointPlaneModelPair(intersectionPoint, planeModel);
     }
 
