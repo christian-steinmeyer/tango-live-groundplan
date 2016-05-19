@@ -99,11 +99,13 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     private TangoPointCloudManager mPointCloudManager;
     private Tango mTango;
     private boolean mIsConnected = false;
+    private boolean mIsMeasuring = false;
     private double mCameraPoseTimestamp = 0;
     private List<WallMeasurement> mWallMeasurementList;
     private Floorplan mFloorplan;
     private FinishPlanTask mFinishPlanTask;
     private Button mDoneButton;
+    private Button mMeasureButton;
     private ViewGroup mProgressGroup;
 
     // Texture rendering related fields
@@ -137,6 +139,13 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             @Override
             public void onClick(View view) {
                 finishPlan();
+            }
+        });
+        mMeasureButton = (Button) findViewById(R.id.measure_button);
+        mMeasureButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mIsMeasuring = !mIsMeasuring;
             }
         });
     }
@@ -257,7 +266,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             public void onXyzIjAvailable(TangoXyzIjData xyzIj) {
                 // Save the cloud and point data for later use.
                 mPointCloudManager.updateXyzIj(xyzIj);
-                measureForWalls();
+                if (mIsMeasuring) {
+                    measureForWalls();
+                }
             }
 
             @Override
@@ -423,12 +434,26 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     private double getAngle(double[] orientation, double[] other) {
+
         Quaternion wallOrientation =
                 new Quaternion(orientation[0], orientation[1], orientation[2], orientation[3]);
         Quaternion newWallOrientation = new Quaternion(other[0], other[1], other[2], other[3]);
         wallOrientation.normalize();
         newWallOrientation.normalize();
         return wallOrientation.angleBetween(newWallOrientation);
+    }
+
+    /**
+     * Calculates the angle between two planes according to http://mathworld.wolfram
+     * .com/DihedralAngle.html
+     */
+    private double getAngleBetweenPlanes(double[] a, double[] b) {
+        double numerator = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]);
+        double aFactor = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+        double bFactor = Math.sqrt(b[0] * b[0] + b[1] * b[1] + b[2] * b[2]);
+        double denumerator = aFactor * bFactor;
+        double result = Math.acos(numerator / denumerator);
+        return result;
     }
 
     /**
@@ -450,21 +475,19 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 .calculateRelativePose(rgbTimestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR,
                         xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
 
+        // Get the device pose at the time the plane data was acquired.
+        TangoPoseData devicePose = mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
 
         IntersectionPointPlaneModelPair wall =
-                measureWall(xyzIj, colorTdepthPose, 4, 4, 10);
+                measureWall(xyzIj, devicePose, colorTdepthPose, 4, 4, 10);
         if (wall == null) {
             return null;
         }
 
-        // Get the device pose at the time the plane data was acquired.
-        TangoPoseData devicePose = mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
-
 
         // Update the AR object location.
         TangoPoseData planeFitPose =
-                calculatePlanePose(wall.intersectionPoint, wall.planeModel,
-                        devicePose);
+                calculatePlanePose(wall.intersectionPoint, wall.planeModel, devicePose);
 
         return new WallMeasurement(planeFitPose, devicePose);
     }
@@ -477,6 +500,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      *
      * @param xyzIj
      *         required to create planes
+     * @param devicePose
+     *         required to create planes
      * @param colorTdepthPose
      *         required to create planes
      * @param horizontals
@@ -484,19 +509,21 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * @param verticals
      *         number of vertical measure points (in one column)
      * @param minCommons
-     *         number of common measure points required for positive feedback
-     * @return average of all input information
+     *         number of common measure points required for positive feedback     @return average of
+     *         all input information
      */
-    private IntersectionPointPlaneModelPair measureWall(
-            TangoXyzIjData xyzIj, TangoPoseData colorTdepthPose, int horizontals, int verticals,
-            int minCommons) {
+    private IntersectionPointPlaneModelPair measureWall(TangoXyzIjData xyzIj,
+                                                        TangoPoseData devicePose,
+                                                        TangoPoseData colorTdepthPose,
+                                                        int horizontals, int verticals,
+                                                        int minCommons) {
 
         List<IntersectionPointPlaneModelPair> candidates =
-                getCandidates(xyzIj, colorTdepthPose, horizontals, verticals);
+                getCandidates(xyzIj, devicePose, colorTdepthPose, horizontals, verticals);
 
         List<IntersectionPointPlaneModelPair> winners = removeOutliers(candidates);
         Log.i(TAG, candidates.size() + " candidates and " + winners.size() + " winners");
-        if (winners.size() < minCommons){
+        if (winners.size() < minCommons) {
             return null;
         }
 
@@ -504,6 +531,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     private List<IntersectionPointPlaneModelPair> getCandidates(TangoXyzIjData xyzIj,
+                                                                TangoPoseData devicePose,
                                                                 TangoPoseData colorTdepthPose,
                                                                 int horizontals, int verticals) {
         List<IntersectionPointPlaneModelPair> candidates = new ArrayList<>();
@@ -513,9 +541,12 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         for (float x = hStep; x < 1f; x += hStep) {
             for (float y = vStep; y < 1f; y += vStep) {
-                try{
-                    candidates.add(TangoSupport
-                            .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, x, y));
+                try {
+                    IntersectionPointPlaneModelPair candidate = TangoSupport
+                            .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, x, y);
+                    if (isAlignedWithGravity(candidate, devicePose)) {
+                        candidates.add(candidate);
+                    }
                 } catch (TangoException t) {
                     Log.e(TAG, getString(R.string.failed_measurement));
                 } catch (SecurityException t) {
@@ -526,14 +557,33 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         return candidates;
     }
 
+    private boolean isAlignedWithGravity(IntersectionPointPlaneModelPair candidate,
+                                         TangoPoseData devicePose) {
+        Matrix4 adfTdevice = ScenePoseCalculator.tangoPoseToMatrix(devicePose);
+        Vector3 gravityVector = ScenePoseCalculator.TANGO_WORLD_UP.clone();
+        adfTdevice.clone().multiply(mExtrinsics.getDeviceTDepthCamera()).inverse().
+                rotateVector(gravityVector);
+
+        double[] gravity = new double[]{gravityVector.x, gravityVector.y, gravityVector.z};
+        double angle = getAngleBetweenPlanes(candidate.planeModel, gravity);
+        Log.d(TAG, "angle: " + angle);
+        if (angle < 0.1) {
+            return false;
+        }
+        return true;
+    }
+
     private List<IntersectionPointPlaneModelPair> removeOutliers(
             List<IntersectionPointPlaneModelPair> candidates) {
         List<IntersectionPointPlaneModelPair> result = new ArrayList<>();
-        boolean [][] candidatePairs = new boolean[candidates.size()][candidates.size()];
+        boolean[][] candidatePairs = new boolean[candidates.size()][candidates.size()];
 
         for (int i = 0; i < candidates.size(); i++) {
             for (int j = i + 1; j < candidates.size(); j++) {
-                if (getAngle(candidates.get(i).planeModel, candidates.get(j).planeModel) < 0.05) {
+                double angle = getAngleBetweenPlanes(candidates.get(i).planeModel,
+                        candidates.get(j).planeModel);
+                Log.d(TAG, "Angle: " + angle);
+                if (angle < 0.05) {
                     candidatePairs[i][j] = true;
                     candidatePairs[j][i] = true;
                 }
@@ -542,10 +592,10 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         int max = 0;
         int index = -1;
-        for (int i = 0; i < candidates.size(); i++){
+        for (int i = 0; i < candidates.size(); i++) {
             int pairCount = 0;
-            for (int j = 0; j < candidates.size(); j++){
-                if (candidatePairs[i][j]){
+            for (int j = 0; j < candidates.size(); j++) {
+                if (candidatePairs[i][j]) {
                     pairCount++;
                 }
             }
@@ -553,12 +603,10 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             max = Math.max(max, pairCount);
         }
 
-        if (index > -1){
-            for (int i = 0; i < candidates.size(); i++){
-                if (candidatePairs[index][i]){
+        if (index > -1) {
+            for (int i = 0; i < candidates.size(); i++) {
+                if (candidatePairs[index][i]) {
                     result.add(candidates.get(i));
-                } else {
-                    Log.i(TAG, "Removed outlier: " + candidates.get(i));
                 }
             }
         }
@@ -571,7 +619,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         double[] intersectionPoint = new double[3];
         double[] planeModel = new double[4];
         for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
-            for (int i = 0; i < 3; i++){
+            for (int i = 0; i < 3; i++) {
                 intersectionPoint[i] += each.intersectionPoint[i];
                 planeModel[i] += each.planeModel[i];
             }
