@@ -479,7 +479,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         TangoPoseData devicePose = mTango.getPoseAtTime(xyzIj.timestamp, FRAME_PAIR);
 
         IntersectionPointPlaneModelPair wall =
-                measureWall(xyzIj, devicePose, colorTdepthPose, 4, 4, 10);
+                measureWall(xyzIj, devicePose, colorTdepthPose, 3, 3, 4);
         if (wall == null) {
             return null;
         }
