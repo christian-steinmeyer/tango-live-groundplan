@@ -58,21 +58,21 @@ import javax.microedition.khronos.opengles.GL10;
 
 /**
  * Very simple augmented reality example which displays cubes fixed in place for every
- * WallMeasurement and a continuous line for the perimeter of the floor plan.
- * Each time the user clicks on the screen, a cube is placed flush with the surface detected
- * using the point cloud data at the position clicked.
+ * WallMeasurement and a continuous line for the perimeter of the floor plan. Each time the user
+ * clicks on the screen, a cube is placed flush with the surface detected using the point cloud data
+ * at the position clicked.
  */
 public class FloorplanRenderer extends RajawaliRenderer {
     private static final float CUBE_SIDE_LENGTH = 1f;
     private static final String TAG = FloorplanRenderer.class.getSimpleName();
 
-    private List<Pose> mNewPoseList = new ArrayList<Pose>();
+    private List<Pose> mNewPoseList = new ArrayList<>();
     private boolean mObjectPoseUpdated = false;
     private boolean mPlanUpdated = false;
     private Material mPlaneMaterial;
     private Object3D mPlanLine = null;
     private Stack<Vector3> mPlanPoints;
-    private List<Object3D> mMeasurementObjectList = new ArrayList<Object3D>();
+    private List<Object3D> mMeasurementObjectList = new ArrayList<>();
 
 
     // Augmented reality related fields
@@ -173,32 +173,17 @@ public class FloorplanRenderer extends RajawaliRenderer {
         super.onRender(elapsedRealTime, deltaTime);
     }
 
-    private FloatBuffer removeAnythingButWalls(FloatBuffer xyz) {
-        List<Float> result = new ArrayList<Float>();
-        for (int i = 0; i < xyz.capacity() - 3; i = i + 3) {
-            // TODO if in wall
-            result.add(xyz.get(i));
-            result.add(xyz.get(i + 1));
-            result.add(xyz.get(i + 2));
-        }
-        float[] resultPrimitive = new float[result.size()];
-        for (int i = 0; i < result.size(); i++) {
-            resultPrimitive[i] = result.get(i);
-        }
-        return FloatBuffer.wrap(resultPrimitive);
-    }
-
     /**
-     * Update the scene camera based on the provided pose in Tango start of service frame.
-     * The device pose should match the pose of the device at the time of the last rendered RGB
-     * frame, which can be retrieved with this.getTimestamp();
-     *
+     * Update the scene camera based on the provided pose in Tango start of service frame. The
+     * device pose should match the pose of the device at the time of the last rendered RGB frame,
+     * which can be retrieved with this.getTimestamp();
+     * <p>
      * NOTE: This must be called from the OpenGL render thread - it is not thread safe.
      */
     public void updateRenderCameraPose(TangoPoseData devicePose) {
-        TangoPoseData cameraPose = TangoSupport.getPoseInEngineFrame(
-                TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
-                TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR, devicePose);
+        TangoPoseData cameraPose = TangoSupport
+                .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
+                        TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR, devicePose);
         float[] rotation = cameraPose.getRotationAsFloats();
         float[] translation = cameraPose.getTranslationAsFloats();
         // Conjugation is needed because Rajawali uses left handed convention for rotations.
@@ -209,8 +194,8 @@ public class FloorplanRenderer extends RajawaliRenderer {
 
     /**
      * It returns the ID currently assigned to the texture where the Tango color camera contents
-     * should be rendered.
-     * NOTE: This must be called from the OpenGL render thread - it is not thread safe.
+     * should be rendered. NOTE: This must be called from the OpenGL render thread - it is not
+     * thread safe.
      */
     public int getTextureId() {
         return mTangoCameraTexture == null ? -1 : mTangoCameraTexture.getTextureId();
@@ -235,15 +220,14 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * provided by the {@code TangoCameraIntrinsics}.
      */
     public void setProjectionMatrix(TangoCameraIntrinsics intrinsics) {
-        Matrix4 projectionMatrix = ScenePoseCalculator.calculateProjectionMatrix(
-                intrinsics.width, intrinsics.height,
-                intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy);
+        Matrix4 projectionMatrix = ScenePoseCalculator
+                .calculateProjectionMatrix(intrinsics.width, intrinsics.height, intrinsics.fx,
+                        intrinsics.fy, intrinsics.cx, intrinsics.cy);
         getCurrentCamera().setProjectionMatrix(projectionMatrix);
     }
 
     @Override
-    public void onOffsetsChanged(float xOffset, float yOffset,
-                                 float xOffsetStep, float yOffsetStep,
+    public void onOffsetsChanged(float xOffset, float yOffset, float xOffsetStep, float yOffsetStep,
                                  int xPixelOffset, int yPixelOffset) {
     }
 
@@ -253,20 +237,27 @@ public class FloorplanRenderer extends RajawaliRenderer {
     }
 
     /**
-     * Add a new WallMeasurement.
-     * A new cube will be added at the plane position and orientation to represent the measurement.
+     * Add a new WallMeasurement. A new cube will be added at the plane position and orientation to
+     * represent the measurement.
      */
-    public synchronized void addWallMeasurement(WallMeasurement wallMeasurement) {
-        TangoPoseData openGLPose = TangoSupport.getPoseInEngineFrame(
-                TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
-                TangoPoseData.COORDINATE_FRAME_DEVICE,
-                wallMeasurement.getPlanePose()
-        );
-        float[] rotation = openGLPose.getRotationAsFloats();
-        float[] translation = openGLPose.getTranslationAsFloats();
+    public synchronized void addCornerMeasurement(CornerMeasurement cornerMeasurement) {
+        TangoPoseData wallOpenGlPose = TangoSupport
+                .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
+                        TangoPoseData.COORDINATE_FRAME_DEVICE, cornerMeasurement.wallPoseData);
+        float[] rotation = wallOpenGlPose.getRotationAsFloats();
+        float[] translation = wallOpenGlPose.getTranslationAsFloats();
         mNewPoseList.add(new Pose(new Vector3(translation[0], translation[1], translation[2]),
                 new Quaternion(rotation[3], rotation[0], rotation[1], rotation[2])));
-        Log.d(TAG, mNewPoseList.get(mNewPoseList.size() - 1).toString());
+
+        TangoPoseData otherWallOpenGlPose = TangoSupport
+                .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
+                        TangoPoseData.COORDINATE_FRAME_DEVICE, cornerMeasurement.otherWallPoseData);
+        float[] otherRotation = otherWallOpenGlPose.getRotationAsFloats();
+        float[] otherTranslation = otherWallOpenGlPose.getTranslationAsFloats();
+        mNewPoseList.add(new Pose(
+                new Vector3(otherTranslation[0], otherTranslation[1], otherTranslation[2]),
+                new Quaternion(otherRotation[3], otherRotation[0], otherRotation[1],
+                        otherRotation[2])));
         mObjectPoseUpdated = true;
     }
 
@@ -274,7 +265,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * Update the perimeter line with the new floor plan.
      */
     public synchronized void updatePlan(Floorplan plan) {
-        Stack<Vector3> points = new Stack<Vector3>();
+        Stack<Vector3> points = new Stack<>();
         for (Vector3 vector3 : plan.getPlanPoints()) {
             TangoPoseData pose = new TangoPoseData();
             // Render z = 0.
@@ -284,9 +275,9 @@ public class FloorplanRenderer extends RajawaliRenderer {
             // default target frame to place objects in the OpenGL world with
             // TangoSupport.getPoseInEngineFrame.
             pose.targetFrame = TangoPoseData.COORDINATE_FRAME_DEVICE;
-            TangoPoseData openGLPose = TangoSupport.getPoseInEngineFrame(
-                    TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
-                    TangoPoseData.COORDINATE_FRAME_DEVICE, pose);
+            TangoPoseData openGLPose = TangoSupport
+                    .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
+                            TangoPoseData.COORDINATE_FRAME_DEVICE, pose);
             float[] translation = openGLPose.getTranslationAsFloats();
             points.add(new Vector3(translation[0], translation[1], translation[2]));
         }

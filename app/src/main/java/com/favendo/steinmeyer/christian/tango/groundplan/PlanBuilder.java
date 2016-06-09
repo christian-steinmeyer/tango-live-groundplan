@@ -28,40 +28,19 @@ public class PlanBuilder {
     /**
      * Creates a new Floorplan object beased on the measurements that we have so far.
      *
-     * @param wallMeasurementList List of WallMeasurements to use as input to build the plan.
-     *                            It must have only one measurement per wall.
-     * @param closed              If true, close the floor plan and intersect the first and last
-     *                            measurements. If false, continue the floor plan.
+     * @param cornerMeasurementList
+     *         List of WallMeasurements to use as input to build the plan. It must have only one
+     *         measurement per wall.
+     * @param closed
+     *         If true, close the floor plan and intersect the first and last measurements. If
+     *         false, continue the floor plan.
      */
-    public static Floorplan buildPlan(List<WallMeasurement> wallMeasurementList, boolean closed) {
-        List<Vector3> planPoints = new ArrayList<Vector3>();
-        WallMeasurement lastWallMeasurement = null;
+    public static Floorplan buildPlan(List<CornerMeasurement> cornerMeasurementList,
+                                      boolean closed) {
+        List<Vector3> planPoints = new ArrayList<>();
         // Intersect every measurement with the previous one and add the result to the plan.
-        if (!wallMeasurementList.isEmpty()) {
-            boolean first = true;
-            Vector3 lastAddedPoint = null;
-            for (WallMeasurement wallMeasurement : wallMeasurementList) {
-                if (lastWallMeasurement != null) {
-                    if (!first) {
-                        planPoints.remove(lastAddedPoint);
-                    }
-                    planPoints.add(wallMeasurement.intersect(lastWallMeasurement));
-                    first = false;
-                }
-                float[] translation = wallMeasurement.getPlanePose().getTranslationAsFloats();
-                Vector3 measurementPoint = new Vector3(translation[0], translation[1],
-                        translation[2]);
-                planPoints.add(measurementPoint);
-                lastWallMeasurement = wallMeasurement;
-                lastAddedPoint = measurementPoint;
-            }
-
-            // If closing the floor plan, intersect the first and last measurements.
-            if (closed) {
-                planPoints.remove(lastAddedPoint);
-                planPoints.add(lastWallMeasurement.intersect(wallMeasurementList.get(0)));
-                planPoints.remove(planPoints.get(0));
-            }
+        for (CornerMeasurement cornerMeasurement : cornerMeasurementList) {
+            planPoints.add(cornerMeasurement.vertex);
         }
         return new Floorplan(planPoints);
     }
