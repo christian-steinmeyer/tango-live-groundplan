@@ -451,8 +451,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         Quaternion wallOrientation =
                 new Quaternion(orientation[0], orientation[1], orientation[2], orientation[3]);
         Quaternion newWallOrientation = new Quaternion(other[0], other[1], other[2], other[3]);
-        wallOrientation.normalize();
-        newWallOrientation.normalize();
         return wallOrientation.angleBetween(newWallOrientation);
     }
 
@@ -569,7 +567,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     private boolean isAlignedWithGravity(IntersectionPointPlaneModelPair candidate,
-                                         TangoPoseData devicePose, double maxDeviation) {
+                                             TangoPoseData devicePose, double maxDeviation) {
         Matrix4 adfTdevice = ScenePoseCalculator.tangoPoseToMatrix(devicePose);
         Vector3 gravityVector = ScenePoseCalculator.TANGO_WORLD_UP.clone();
         adfTdevice.clone().multiply(mExtrinsics.getDeviceTDepthCamera()).inverse().
