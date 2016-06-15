@@ -121,8 +121,11 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     // Time
     private static final int SECS_TO_MILLISECS = 1000;
     private double mXyIjPreviousTimeStamp;
-    private static final double UPDATE_INTERVAL_MS = 250.0;
+    private static final double UPDATE_INTERVAL_MS = 1000.0 / 3;
     private double mXyzIjTimeToNextUpdate = UPDATE_INTERVAL_MS;
+
+    // Accuracy
+    private static final double MAX_DEVIATION = Math.PI / 90; // = 2°
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -495,7 +498,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         WallMeasurement right = new WallMeasurement(rightPlaneFitPose, devicePose);
 
         CornerMeasurement cornerMeasurement = null;
-        if (Math.abs(getAngleBetweenPlanes(leftWall.planeModel, rightWall.planeModel)) > 0.05) {
+        if (Math.abs(getAngleBetweenPlanes(leftWall.planeModel, rightWall.planeModel)) >
+                MAX_DEVIATION) {
             cornerMeasurement = new CornerMeasurement(left, right);
         }
 
@@ -532,7 +536,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         List<IntersectionPointPlaneModelPair> candidates =
                 getCandidates(xyzIj, devicePose, colorTdepthPose, horizontals, verticals, left);
 
-        List<IntersectionPointPlaneModelPair> winners = getWinners(candidates, 0.02);
+        List<IntersectionPointPlaneModelPair> winners = getWinners(candidates, MAX_DEVIATION);
         Log.i(TAG, candidates.size() + " candidates and " + winners.size() + " winners");
         if (winners.size() < minCommons) {
             return null;
@@ -561,7 +565,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 try {
                     IntersectionPointPlaneModelPair candidate = TangoSupport
                             .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, x, y);
-                    if (isAlignedWithGravity(candidate, devicePose, 0.02)) {
+                    if (isAlignedWithGravity(candidate, devicePose, MAX_DEVIATION)) {
                         candidates.add(candidate);
                         status.addCircle(x, y, true);
                     } else {
@@ -574,12 +578,14 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 }
             }
         }
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                status.invalidate();
-            }
-        });
+        if (!left) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    status.invalidate();
+                }
+            });
+        }
         return candidates;
     }
 
@@ -806,32 +812,31 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     }
 
     private class StatusView extends View {
-        private String TAG = "StatusView";
-        private Paint mWallPaint;
-        private Paint mNotWallPaint;
-        private int RADIUS = 20;
+        private Paint mCandidatePaint;
+        private Paint mNoCandidatePaint;
+        private int RADIUS = 15;
+        private int ALPHA = 50;
         private Collection<Circle> circles = new ArrayList<>();
 
         public StatusView(Context context) {
             super(context);
-            mWallPaint = new Paint();
-            mWallPaint.setStyle(Paint.Style.FILL);
-            mWallPaint.setStrokeWidth(3);
-            mWallPaint.setColor(Color.GREEN);
-            mWallPaint.setAlpha(50);
+            mCandidatePaint = new Paint();
+            mCandidatePaint.setStyle(Paint.Style.FILL);
+            mCandidatePaint.setStrokeWidth(3);
+            mCandidatePaint.setColor(Color.GREEN);
+            mCandidatePaint.setAlpha(ALPHA);
 
-            mNotWallPaint = new Paint();
-            mNotWallPaint.setStyle(Paint.Style.FILL);
-            mNotWallPaint.setStrokeWidth(3);
-            mNotWallPaint.setColor(Color.RED);
-            mNotWallPaint.setAlpha(50);
+            mNoCandidatePaint = new Paint();
+            mNoCandidatePaint.setStyle(Paint.Style.FILL);
+            mNoCandidatePaint.setStrokeWidth(3);
+            mNoCandidatePaint.setColor(Color.RED);
+            mNoCandidatePaint.setAlpha(ALPHA);
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            Log.i(TAG, "drawing " + circles.size() + " circles");
-            synchronized (circles){
+            synchronized (this) {
                 for (Circle circle : circles) {
                     canvas.drawCircle(circle.x, circle.y, circle.radius, circle.paint);
                 }
@@ -839,15 +844,14 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         }
 
         public void clear() {
-            Log.i(TAG, "Clearing");
             circles.clear();
         }
 
-        public void addCircle(float x, float y, boolean inWall) {
-            Paint paint = inWall ? mWallPaint : mNotWallPaint;
+        public void addCircle(float x, float y, boolean isCandidate) {
+            Paint paint = isCandidate ? mCandidatePaint : mNoCandidatePaint;
             int width = getWidth();
             int height = getHeight();
-            synchronized (circles) {
+            synchronized (this) {
                 circles.add(new Circle(width * x, height * y, RADIUS, paint));
             }
         }
