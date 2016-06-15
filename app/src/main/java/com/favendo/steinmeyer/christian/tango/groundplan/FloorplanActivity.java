@@ -818,19 +818,23 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             mWallPaint.setStyle(Paint.Style.FILL);
             mWallPaint.setStrokeWidth(3);
             mWallPaint.setColor(Color.GREEN);
+            mWallPaint.setAlpha(50);
 
             mNotWallPaint = new Paint();
             mNotWallPaint.setStyle(Paint.Style.FILL);
             mNotWallPaint.setStrokeWidth(3);
             mNotWallPaint.setColor(Color.RED);
+            mNotWallPaint.setAlpha(50);
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             Log.i(TAG, "drawing " + circles.size() + " circles");
-            for (Circle circle : circles) {
-                canvas.drawCircle(circle.x, circle.y, circle.radius, circle.paint);
+            synchronized (circles){
+                for (Circle circle : circles) {
+                    canvas.drawCircle(circle.x, circle.y, circle.radius, circle.paint);
+                }
             }
         }
 
@@ -843,7 +847,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             Paint paint = inWall ? mWallPaint : mNotWallPaint;
             int width = getWidth();
             int height = getHeight();
-            circles.add(new Circle(width * x, height * y, RADIUS, paint));
+            synchronized (circles) {
+                circles.add(new Circle(width * x, height * y, RADIUS, paint));
+            }
         }
     }
 }
