@@ -732,12 +732,13 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * was taken.
      */
     public void updateMeasurements() {
+        mRenderer.removeCornerMeasurements();
         for (CornerMeasurement cornerMeasurement : mCornerMeasurementList) {
             TangoPoseData newDevicePose =
                     mTango.getPoseAtTime(cornerMeasurement.wallMeasurement.getDevicePoseTimeStamp(),
                             FRAME_PAIR);
             cornerMeasurement.update(newDevicePose);
-            // TODO somehow inform the renderer?
+            mRenderer.addCornerMeasurement(cornerMeasurement);
         }
     }
 

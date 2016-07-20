@@ -135,7 +135,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
                 Object3D object3D;
                 while (poseIterator.hasNext()) {
                     Pose pose = poseIterator.next();
-                    object3D = new Plane(CUBE_SIDE_LENGTH, CUBE_SIDE_LENGTH, 2, 2);
+                    object3D = new Plane(CUBE_SIDE_LENGTH, CUBE_SIDE_LENGTH, 1, 1);
                     object3D.setMaterial(mPlaneMaterial);
                     // Rotate around X axis so the texture is applied correctly.
                     // NOTE: This may be a Rajawali bug.
@@ -294,5 +294,10 @@ public class FloorplanRenderer extends RajawaliRenderer {
         for (Object3D object3D : mMeasurementObjectList) {
             getCurrentScene().removeChild(object3D);
         }
+    }
+
+    public void removeCornerMeasurements() {
+        mNewPoseList = new ArrayList<>();
+        mObjectPoseUpdated = false;
     }
 }
