@@ -16,17 +16,6 @@
 
 package com.favendo.steinmeyer.christian.tango.groundplan;
 
-import com.google.atap.tangoservice.Tango;
-import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
-import com.google.atap.tangoservice.TangoCameraIntrinsics;
-import com.google.atap.tangoservice.TangoConfig;
-import com.google.atap.tangoservice.TangoCoordinateFramePair;
-import com.google.atap.tangoservice.TangoEvent;
-import com.google.atap.tangoservice.TangoException;
-import com.google.atap.tangoservice.TangoOutOfDateException;
-import com.google.atap.tangoservice.TangoPoseData;
-import com.google.atap.tangoservice.TangoXyzIjData;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -43,6 +32,23 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import com.google.atap.tangoservice.Tango;
+import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
+import com.google.atap.tangoservice.TangoCameraIntrinsics;
+import com.google.atap.tangoservice.TangoConfig;
+import com.google.atap.tangoservice.TangoCoordinateFramePair;
+import com.google.atap.tangoservice.TangoEvent;
+import com.google.atap.tangoservice.TangoException;
+import com.google.atap.tangoservice.TangoOutOfDateException;
+import com.google.atap.tangoservice.TangoPoseData;
+import com.google.atap.tangoservice.TangoXyzIjData;
+import com.projecttango.examples.java.floorplan.R;
+import com.projecttango.rajawali.DeviceExtrinsics;
+import com.projecttango.rajawali.ScenePoseCalculator;
+import com.projecttango.tangosupport.TangoPointCloudManager;
+import com.projecttango.tangosupport.TangoSupport;
+import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
+
 import org.rajawali3d.math.Matrix4;
 import org.rajawali3d.math.Quaternion;
 import org.rajawali3d.math.vector.Vector3;
@@ -53,13 +59,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.DeviceExtrinsics;
-import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.tangosupport.TangoPointCloudManager;
-import com.projecttango.tangosupport.TangoSupport;
-import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
 
 /**
  * An example showing how to build a very simple application that allows the user to create a floor
@@ -432,6 +431,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 mWallMeasurementList.add(wallMeasurement);
                 mRenderer.addWallMeasurement(wallMeasurement);
                 buildPlan(false);
+            } else {
+                Log.i(TAG, "Wall already exists.");
             }
         }
     }
@@ -440,7 +441,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         for (WallMeasurement wall : mWallMeasurementList) {
             double angle = getAngleBetweenPlanes(newWall.getPlanePose().rotation, wall.getPlanePose().rotation);
             if (angle < 0.05) {
-                return false;
+                boolean isTheSameWallAsLastMeasured = mWallMeasurementList.indexOf(wall) == mWallMeasurementList.size() - 1;
+                return !isTheSameWallAsLastMeasured;
             }
         }
         return true;
@@ -499,19 +501,13 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * consider <code>accuracy</code> number of points and tries to fit an average plane for which
      * only the ones closer than 5% to the original one are considered.
      *
-     * @param xyzIj
-     *         required to create planes
-     * @param devicePose
-     *         required to create planes
-     * @param colorTdepthPose
-     *         required to create planes
-     * @param horizontals
-     *         number of horizontal measure points (in one line)
-     * @param verticals
-     *         number of vertical measure points (in one column)
-     * @param minCommons
-     *         number of common measure points required for positive feedback     @return average of
-     *         all input information
+     * @param xyzIj           required to create planes
+     * @param devicePose      required to create planes
+     * @param colorTdepthPose required to create planes
+     * @param horizontals     number of horizontal measure points (in one line)
+     * @param verticals       number of vertical measure points (in one column)
+     * @param minCommons      number of common measure points required for positive feedback     @return average of
+     *                        all input information
      */
     private IntersectionPointPlaneModelPair measureWall(TangoXyzIjData xyzIj,
                                                         TangoPoseData devicePose,
@@ -683,8 +679,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     /**
      * Builds the plan from the set of measurements and updates the rendering in AR.
      *
-     * @param closed
-     *         If true, close the floor plan; if false, continue the floor plan.
+     * @param closed If true, close the floor plan; if false, continue the floor plan.
      */
     public void buildPlan(boolean closed) {
         mFloorplan = PlanBuilder.buildPlan(mWallMeasurementList, closed);
