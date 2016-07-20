@@ -22,14 +22,9 @@ import android.view.MotionEvent;
 
 import com.google.atap.tangoservice.TangoCameraIntrinsics;
 import com.google.atap.tangoservice.TangoPoseData;
-import com.google.atap.tangoservice.TangoXyzIjData;
 import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.DeviceExtrinsics;
 import com.projecttango.rajawali.Pose;
 import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.rajawali.TouchViewHandler;
-import com.projecttango.rajawali.renderables.FrustumAxes;
-import com.projecttango.rajawali.renderables.PointCloud;
 import com.projecttango.tangosupport.TangoSupport;
 
 import org.rajawali3d.Object3D;
@@ -63,16 +58,16 @@ import javax.microedition.khronos.opengles.GL10;
  * using the point cloud data at the position clicked.
  */
 public class FloorplanRenderer extends RajawaliRenderer {
-    private static final float CUBE_SIDE_LENGTH = 1f;
+    private static final float CUBE_SIDE_LENGTH = 0.5f;
     private static final String TAG = FloorplanRenderer.class.getSimpleName();
 
-    private List<Pose> mNewPoseList = new ArrayList<Pose>();
+    private List<Pose> mNewPoseList = new ArrayList<>();
     private boolean mObjectPoseUpdated = false;
     private boolean mPlanUpdated = false;
     private Material mPlaneMaterial;
     private Object3D mPlanLine = null;
     private Stack<Vector3> mPlanPoints;
-    private List<Object3D> mMeasurementObjectList = new ArrayList<Object3D>();
+    private List<Object3D> mMeasurementObjectList = new ArrayList<>();
 
 
     // Augmented reality related fields
@@ -174,7 +169,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
     }
 
     private FloatBuffer removeAnythingButWalls(FloatBuffer xyz) {
-        List<Float> result = new ArrayList<Float>();
+        List<Float> result = new ArrayList<>();
         for (int i = 0; i < xyz.capacity() - 3; i = i + 3) {
             // TODO if in wall
             result.add(xyz.get(i));
@@ -192,7 +187,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * Update the scene camera based on the provided pose in Tango start of service frame.
      * The device pose should match the pose of the device at the time of the last rendered RGB
      * frame, which can be retrieved with this.getTimestamp();
-     *
+     * <p/>
      * NOTE: This must be called from the OpenGL render thread - it is not thread safe.
      */
     public void updateRenderCameraPose(TangoPoseData devicePose) {
@@ -274,7 +269,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * Update the perimeter line with the new floor plan.
      */
     public synchronized void updatePlan(Floorplan plan) {
-        Stack<Vector3> points = new Stack<Vector3>();
+        Stack<Vector3> points = new Stack<>();
         for (Vector3 vector3 : plan.getPlanPoints()) {
             TangoPoseData pose = new TangoPoseData();
             // Render z = 0.
