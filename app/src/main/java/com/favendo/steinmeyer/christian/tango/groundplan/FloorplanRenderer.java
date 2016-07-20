@@ -63,7 +63,7 @@ import javax.microedition.khronos.opengles.GL10;
  * at the position clicked.
  */
 public class FloorplanRenderer extends RajawaliRenderer {
-    private static final float CUBE_SIDE_LENGTH = 1f;
+    private static final float CUBE_SIDE_LENGTH = 0.5f;
     private static final String TAG = FloorplanRenderer.class.getSimpleName();
 
     private List<Pose> mNewPoseList = new ArrayList<>();
@@ -135,7 +135,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
                 Object3D object3D;
                 while (poseIterator.hasNext()) {
                     Pose pose = poseIterator.next();
-                    object3D = new Plane(CUBE_SIDE_LENGTH, CUBE_SIDE_LENGTH, 1, 1);
+                    object3D = new Plane(CUBE_SIDE_LENGTH, CUBE_SIDE_LENGTH, 2, 2);
                     object3D.setMaterial(mPlaneMaterial);
                     // Rotate around X axis so the texture is applied correctly.
                     // NOTE: This may be a Rajawali bug.
