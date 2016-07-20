@@ -177,7 +177,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * Update the scene camera based on the provided pose in Tango start of service frame. The
      * device pose should match the pose of the device at the time of the last rendered RGB frame,
      * which can be retrieved with this.getTimestamp();
-     * <p>
+     * <p/>
      * NOTE: This must be called from the OpenGL render thread - it is not thread safe.
      */
     public void updateRenderCameraPose(TangoPoseData devicePose) {
@@ -243,7 +243,8 @@ public class FloorplanRenderer extends RajawaliRenderer {
     public synchronized void addCornerMeasurement(CornerMeasurement cornerMeasurement) {
         TangoPoseData wallOpenGlPose = TangoSupport
                 .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
-                        TangoPoseData.COORDINATE_FRAME_DEVICE, cornerMeasurement.wallPoseData);
+                        TangoPoseData.COORDINATE_FRAME_DEVICE,
+                        cornerMeasurement.wallMeasurement.getPlanePose());
         float[] rotation = wallOpenGlPose.getRotationAsFloats();
         float[] translation = wallOpenGlPose.getTranslationAsFloats();
         mNewPoseList.add(new Pose(new Vector3(translation[0], translation[1], translation[2]),
@@ -251,7 +252,8 @@ public class FloorplanRenderer extends RajawaliRenderer {
 
         TangoPoseData otherWallOpenGlPose = TangoSupport
                 .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
-                        TangoPoseData.COORDINATE_FRAME_DEVICE, cornerMeasurement.otherWallPoseData);
+                        TangoPoseData.COORDINATE_FRAME_DEVICE,
+                        cornerMeasurement.otherWallMeasurement.getPlanePose());
         float[] otherRotation = otherWallOpenGlPose.getRotationAsFloats();
         float[] otherTranslation = otherWallOpenGlPose.getTranslationAsFloats();
         mNewPoseList.add(new Pose(

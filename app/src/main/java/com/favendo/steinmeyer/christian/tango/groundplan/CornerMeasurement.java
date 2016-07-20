@@ -1,13 +1,9 @@
 package com.favendo.steinmeyer.christian.tango.groundplan;
 
-import android.util.Log;
-
 import com.google.atap.tangoservice.TangoPoseData;
 
 import org.rajawali3d.math.Quaternion;
 import org.rajawali3d.math.vector.Vector3;
-
-import java.text.DecimalFormat;
 
 /**
  * Representation of a corner by a vertex and two walls, given in form of a vector and two
@@ -17,21 +13,27 @@ import java.text.DecimalFormat;
  */
 public class CornerMeasurement {
 
+    public WallMeasurement wallMeasurement;
+    public WallMeasurement otherWallMeasurement;
     public Vector3 vertex;
     public Quaternion wall;
     public Quaternion otherWall;
-    public TangoPoseData wallPoseData;
-    public TangoPoseData otherWallPoseData;
     private double maxDeviation = Math.PI / 90;
 
 
-    public CornerMeasurement(WallMeasurement wall, WallMeasurement otherWall) {
-        vertex = wall.intersect(otherWall);
-        wallPoseData = wall.getPlanePose();
-        otherWallPoseData = otherWall.getPlanePose();
-        double[] r1 = wall.getPlanePose().rotation;
+    public CornerMeasurement(WallMeasurement wallMeasurement,
+                             WallMeasurement otherWallMeasurement) {
+        this.wallMeasurement = wallMeasurement;
+        this.otherWallMeasurement = otherWallMeasurement;
+
+        calculateCorner();
+    }
+
+    private void calculateCorner() {
+        vertex = wallMeasurement.intersect(otherWallMeasurement);
+        double[] r1 = wallMeasurement.getPlanePose().rotation;
         this.wall = new Quaternion(r1[3], r1[0], r1[1], r1[2]);
-        double[] r2 = otherWall.getPlanePose().rotation;
+        double[] r2 = otherWallMeasurement.getPlanePose().rotation;
         this.otherWall = new Quaternion(r2[3], r2[0], r2[1], r2[2]);
         // NOTE: Rajawali quaternions use a left-hand rotation around the axis convention.
     }
@@ -74,5 +76,10 @@ public class CornerMeasurement {
         return vA.angle(vB);
     }
 
+    public void update(TangoPoseData newPoseData){
+        this.wallMeasurement.update(newPoseData);
+        this.otherWallMeasurement.update(newPoseData);
+        calculateCorner();
+    }
 }
 

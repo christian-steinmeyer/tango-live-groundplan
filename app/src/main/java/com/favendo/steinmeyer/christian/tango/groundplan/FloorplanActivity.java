@@ -16,17 +16,6 @@
 
 package com.favendo.steinmeyer.christian.tango.groundplan;
 
-import com.google.atap.tangoservice.Tango;
-import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
-import com.google.atap.tangoservice.TangoCameraIntrinsics;
-import com.google.atap.tangoservice.TangoConfig;
-import com.google.atap.tangoservice.TangoCoordinateFramePair;
-import com.google.atap.tangoservice.TangoEvent;
-import com.google.atap.tangoservice.TangoException;
-import com.google.atap.tangoservice.TangoOutOfDateException;
-import com.google.atap.tangoservice.TangoPoseData;
-import com.google.atap.tangoservice.TangoXyzIjData;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -43,6 +32,23 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import com.google.atap.tangoservice.Tango;
+import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
+import com.google.atap.tangoservice.TangoCameraIntrinsics;
+import com.google.atap.tangoservice.TangoConfig;
+import com.google.atap.tangoservice.TangoCoordinateFramePair;
+import com.google.atap.tangoservice.TangoEvent;
+import com.google.atap.tangoservice.TangoException;
+import com.google.atap.tangoservice.TangoOutOfDateException;
+import com.google.atap.tangoservice.TangoPoseData;
+import com.google.atap.tangoservice.TangoXyzIjData;
+import com.projecttango.examples.java.floorplan.R;
+import com.projecttango.rajawali.DeviceExtrinsics;
+import com.projecttango.rajawali.ScenePoseCalculator;
+import com.projecttango.tangosupport.TangoPointCloudManager;
+import com.projecttango.tangosupport.TangoSupport;
+import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
+
 import org.rajawali3d.math.Matrix4;
 import org.rajawali3d.math.Quaternion;
 import org.rajawali3d.math.vector.Vector3;
@@ -53,13 +59,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.DeviceExtrinsics;
-import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.tangosupport.TangoPointCloudManager;
-import com.projecttango.tangosupport.TangoSupport;
-import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
 
 /**
  * An example showing how to build a very simple application that allows the user to create a floor
@@ -202,7 +201,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
             // Make sure the request was successful
             if (resultCode == RESULT_CANCELED) {
                 Toast.makeText(this, "Area Learning Permissions Required!", Toast.LENGTH_SHORT)
-                        .show();
+                     .show();
                 finish();
             }
         }
@@ -261,7 +260,16 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         mTango.connectListener(framePairs, new OnTangoUpdateListener() {
             @Override
             public void onPoseAvailable(TangoPoseData pose) {
-                // We are not using OnPoseAvailable for this app.
+                if (pose.baseFrame == TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION &&
+                        pose.targetFrame == TangoPoseData.COORDINATE_FRAME_DEVICE) {
+                    // Process new ADF to device pose data.
+                    Log.d(TAG, "NEW ADF TO DEVICE POSE DATA THAT NEEDS TO BE PROCESSED");
+                } else if (pose.baseFrame == TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION &&
+                        pose.targetFrame == TangoPoseData.COORDINATE_FRAME_START_OF_SERVICE) {
+                    // Process new localization.
+                    Log.d(TAG, "NEW LOCATION DATA THAT NEEDS TO BE PROCESSED");
+                }
+                updateMeasurements();
             }
 
             @Override
@@ -364,7 +372,13 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                             mRenderer.updateRenderCameraPose(lastFramePose);
                             mCameraPoseTimestamp = lastFramePose.timestamp;
                         } else {
-                            Log.w(TAG, "Can't get device pose at time: " + mRgbTimestampGlThread);
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Toast.makeText(getBaseContext(), "No Pose available",
+                                            Toast.LENGTH_SHORT);
+                                }
+                            });
                         }
                     }
                 }
@@ -536,11 +550,16 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         List<IntersectionPointPlaneModelPair> candidates =
                 getCandidates(xyzIj, devicePose, colorTdepthPose, horizontals, verticals, left);
 
+        if (candidates.size() < minCommons) {
+            return null;
+        }
+
         List<IntersectionPointPlaneModelPair> winners = getWinners(candidates, MAX_DEVIATION);
-        Log.i(TAG, candidates.size() + " candidates and " + winners.size() + " winners");
         if (winners.size() < minCommons) {
             return null;
         }
+        Log.i(TAG, "Wall: " + candidates.size() + " candidates and " + winners.size() +
+                " winners");
 
         return getAverage(winners);
     }
@@ -571,10 +590,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                     } else {
                         status.addCircle(x, y, false);
                     }
-                } catch (TangoException t) {
-                    Log.e(TAG, getString(R.string.failed_measurement));
-                } catch (SecurityException t) {
-                    Log.e(TAG, getString(R.string.failed_permissions), t);
+                } catch (TangoException | SecurityException t) {
                 }
             }
         }
@@ -606,12 +622,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
     private List<IntersectionPointPlaneModelPair> getWinners(
             List<IntersectionPointPlaneModelPair> candidates, double maxDeviation) {
         List<IntersectionPointPlaneModelPair> result = new ArrayList<>();
-        boolean[][] candidatePairs = new boolean[candidates.size()][candidates.size()];
 
-        findPairs(candidates, maxDeviation, candidatePairs);
-
+        boolean[][] candidatePairs = findPairs(candidates, maxDeviation);
         int index = getIndexOfMostPairs(candidates, candidatePairs);
-
         if (index > -1) {
             for (int i = 0; i < candidates.size(); i++) {
                 if (candidatePairs[index][i]) {
@@ -639,18 +652,20 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         return index;
     }
 
-    private void findPairs(List<IntersectionPointPlaneModelPair> candidates, double maxDeviation,
-                           boolean[][] candidatePairs) {
+    private boolean[][] findPairs(List<IntersectionPointPlaneModelPair> candidates,
+                                  double maxDeviation) {
+        boolean[][] result = new boolean[candidates.size()][candidates.size()];
         for (int i = 0; i < candidates.size(); i++) {
             for (int j = i + 1; j < candidates.size(); j++) {
                 double angle = VectorUtilities.getAngleBetweenVectors(candidates.get(i).planeModel,
                         candidates.get(j).planeModel);
                 if (angle < maxDeviation) {
-                    candidatePairs[i][j] = true;
-                    candidatePairs[j][i] = true;
+                    result[i][j] = true;
+                    result[j][i] = true;
                 }
             }
         }
+        return result;
     }
 
     private IntersectionPointPlaneModelPair getAverage(
@@ -717,13 +732,13 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * was taken.
      */
     public void updateMeasurements() {
-//        for (WallMeasurement wallMeasurement : mCornerMeasurementList) {
-//            // We need to re query the device pose when the measurements were taken.
-//            TangoPoseData newDevicePose =
-//                    mTango.getPoseAtTime(wallMeasurement.getDevicePoseTimeStamp(), FRAME_PAIR);
-//            wallMeasurement.update(newDevicePose);
-//            mRenderer.addCornerMeasurement(wallMeasurement);
-//        }
+        for (CornerMeasurement cornerMeasurement : mCornerMeasurementList) {
+            TangoPoseData newDevicePose =
+                    mTango.getPoseAtTime(cornerMeasurement.wallMeasurement.getDevicePoseTimeStamp(),
+                            FRAME_PAIR);
+            cornerMeasurement.update(newDevicePose);
+            // TODO somehow inform the renderer?
+        }
     }
 
     /**
