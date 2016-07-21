@@ -22,14 +22,9 @@ import android.view.MotionEvent;
 
 import com.google.atap.tangoservice.TangoCameraIntrinsics;
 import com.google.atap.tangoservice.TangoPoseData;
-import com.google.atap.tangoservice.TangoXyzIjData;
 import com.projecttango.examples.java.floorplan.R;
-import com.projecttango.rajawali.DeviceExtrinsics;
 import com.projecttango.rajawali.Pose;
 import com.projecttango.rajawali.ScenePoseCalculator;
-import com.projecttango.rajawali.TouchViewHandler;
-import com.projecttango.rajawali.renderables.FrustumAxes;
-import com.projecttango.rajawali.renderables.PointCloud;
 import com.projecttango.tangosupport.TangoSupport;
 
 import org.rajawali3d.Object3D;
@@ -48,7 +43,6 @@ import org.rajawali3d.primitives.Plane;
 import org.rajawali3d.primitives.ScreenQuad;
 import org.rajawali3d.renderer.RajawaliRenderer;
 
-import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -177,7 +171,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * Update the scene camera based on the provided pose in Tango start of service frame. The
      * device pose should match the pose of the device at the time of the last rendered RGB frame,
      * which can be retrieved with this.getTimestamp();
-     * <p/>
+     * <p>
      * NOTE: This must be called from the OpenGL render thread - it is not thread safe.
      */
     public void updateRenderCameraPose(TangoPoseData devicePose) {
@@ -241,26 +235,20 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * represent the measurement.
      */
     public synchronized void addCornerMeasurement(CornerMeasurement cornerMeasurement) {
+        mNewPoseList.add(getPoseInCorrectFrame(cornerMeasurement.wallMeasurement));
+        mNewPoseList.add(getPoseInCorrectFrame(cornerMeasurement.otherWallMeasurement));
+        mObjectPoseUpdated = true;
+    }
+
+    private Pose getPoseInCorrectFrame(WallMeasurement wallMeasurement){
         TangoPoseData wallOpenGlPose = TangoSupport
                 .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
                         TangoPoseData.COORDINATE_FRAME_DEVICE,
-                        cornerMeasurement.wallMeasurement.getPlanePose());
+                        wallMeasurement.getPlanePose());
         float[] rotation = wallOpenGlPose.getRotationAsFloats();
         float[] translation = wallOpenGlPose.getTranslationAsFloats();
-        mNewPoseList.add(new Pose(new Vector3(translation[0], translation[1], translation[2]),
-                new Quaternion(rotation[3], rotation[0], rotation[1], rotation[2])));
-
-        TangoPoseData otherWallOpenGlPose = TangoSupport
-                .getPoseInEngineFrame(TangoSupport.TANGO_SUPPORT_COORDINATE_CONVENTION_OPENGL,
-                        TangoPoseData.COORDINATE_FRAME_DEVICE,
-                        cornerMeasurement.otherWallMeasurement.getPlanePose());
-        float[] otherRotation = otherWallOpenGlPose.getRotationAsFloats();
-        float[] otherTranslation = otherWallOpenGlPose.getTranslationAsFloats();
-        mNewPoseList.add(new Pose(
-                new Vector3(otherTranslation[0], otherTranslation[1], otherTranslation[2]),
-                new Quaternion(otherRotation[3], otherRotation[0], otherRotation[1],
-                        otherRotation[2])));
-        mObjectPoseUpdated = true;
+        return new Pose(new Vector3(translation[0], translation[1], translation[2]),
+                new Quaternion(rotation[3], rotation[0], rotation[1], rotation[2]));
     }
 
     /**
