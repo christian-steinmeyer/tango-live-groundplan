@@ -66,21 +66,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * the user clicks on the display, plane detection is done on the surface at the location of the
  * click and a 3D object will be placed in the scene anchored at that location. A {@code
  * WallMeasurement} will be recorded for that plane.
- * <p/>
+ * <p>
  * You need to take exactly one measurement per wall in clockwise order. As you take measurements,
  * the perimeter of the floor plan will be displayed as lines in AR. After you have taken all the
  * measurements you can press the 'Done' button and the final result will be drawn in 2D as seen
  * from above along with labels showing the sizes of the walls.
- * <p/>
+ * <p>
  * You are going to be building an ADF as you take the measurements. After pressing the 'Done'
  * button the ADF will be saved and an optimization will be run on it. After that, all the recorded
  * measurements are re-queried and the floor plan will be rebuilt in order to have better
  * precision.
- * <p/>
+ * <p>
  * Note that it is important to include the KEY_BOOLEAN_LOWLATENCYIMUINTEGRATION configuration
  * parameter in order to achieve the best results synchronizing the Rajawali virtual world with the
  * RGB camera.
- * <p/>
+ * <p>
  * For more details on the augmented reality effects, including color camera texture rendering, see
  * java_augmented_reality_example or java_hello_video_example.
  */
@@ -437,7 +437,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         // event.
         CornerMeasurement cornerMeasurement;
         synchronized (this) {
-            cornerMeasurement = doCornerMeasurement(mRgbTimestampGlThread);
+            cornerMeasurement =
+                    doCornerMeasurement(mPointCloudManager.getLatestXyzIj(), mExtrinsics,
+                            mRgbTimestampGlThread);
         }
 
         // If the measurement was successful add it and run the floor plan building
@@ -474,8 +476,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * location in the color camera frame. It returns the pose of the fitted plane in a
      * TangoPoseData structure.
      */
-    private CornerMeasurement doCornerMeasurement(double rgbTimestamp) {
-        TangoXyzIjData xyzIj = mPointCloudManager.getLatestXyzIj();
+    private CornerMeasurement doCornerMeasurement(TangoXyzIjData xyzIj, DeviceExtrinsics extrinsics,
+                                                  double rgbTimestamp) {
 
         if (xyzIj == null) {
             return null;
@@ -503,10 +505,12 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
 
         // Update the AR object location.
         TangoPoseData leftPlaneFitPose =
-                calculatePlanePose(leftWall.intersectionPoint, leftWall.planeModel, devicePose);
+                calculatePlanePose(extrinsics, leftWall.intersectionPoint, leftWall.planeModel,
+                        devicePose);
 
         TangoPoseData rightPlaneFitPose =
-                calculatePlanePose(rightWall.intersectionPoint, rightWall.planeModel, devicePose);
+                calculatePlanePose(extrinsics, rightWall.intersectionPoint, rightWall.planeModel,
+                        devicePose);
 
         WallMeasurement left = new WallMeasurement(leftPlaneFitPose, devicePose);
         WallMeasurement right = new WallMeasurement(rightPlaneFitPose, devicePose);
@@ -558,9 +562,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         if (winners.size() < minCommons) {
             return null;
         }
-        Log.i(TAG, "Wall: " + candidates.size() + " candidates and " + winners.size() +
-                " winners");
-
         return getAverage(winners);
     }
 
@@ -584,7 +585,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
                 try {
                     IntersectionPointPlaneModelPair candidate = TangoSupport
                             .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, x, y);
-                    if (isAlignedWithGravity(candidate, devicePose, MAX_DEVIATION)) {
+                    if (isAlignedWithGravity(mExtrinsics, candidate, devicePose, MAX_DEVIATION)) {
                         candidates.add(candidate);
                         status.addCircle(x, y, true);
                     } else {
@@ -605,11 +606,12 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
         return candidates;
     }
 
-    private boolean isAlignedWithGravity(IntersectionPointPlaneModelPair candidate,
+    private boolean isAlignedWithGravity(DeviceExtrinsics extrinsics,
+                                         IntersectionPointPlaneModelPair candidate,
                                          TangoPoseData devicePose, double maxDeviation) {
         Matrix4 adfTdevice = ScenePoseCalculator.tangoPoseToMatrix(devicePose);
         Vector3 gravityVector = ScenePoseCalculator.TANGO_WORLD_UP.clone();
-        adfTdevice.clone().multiply(mExtrinsics.getDeviceTDepthCamera()).inverse().
+        adfTdevice.clone().multiply(extrinsics.getDeviceTDepthCamera()).inverse().
                 rotateVector(gravityVector);
 
         double[] gravity = new double[]{gravityVector.x, gravityVector.y, gravityVector.z};
@@ -692,19 +694,19 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener 
      * Calculate the pose of the plane based on the position and normal orientation of the plane and
      * align it with gravity.
      */
-    private TangoPoseData calculatePlanePose(double[] point, double normal[],
-                                             TangoPoseData devicePose) {
+    private TangoPoseData calculatePlanePose(DeviceExtrinsics extrinsicses, double[] point,
+                                             double normal[], TangoPoseData devicePose) {
         Matrix4 adfTdevice = ScenePoseCalculator.tangoPoseToMatrix(devicePose);
         // Vector aligned to gravity.
         Vector3 depthUp = ScenePoseCalculator.TANGO_WORLD_UP.clone();
-        adfTdevice.clone().multiply(mExtrinsics.getDeviceTDepthCamera()).inverse().
+        adfTdevice.clone().multiply(extrinsicses.getDeviceTDepthCamera()).inverse().
                 rotateVector(depthUp);
         // Create the plane matrix transform in depth frame from a point, the plane normal and the
         // up vector.
         Matrix4 depthTplane = ScenePoseCalculator.matrixFromPointNormalUp(point, normal, depthUp);
         // Plane matrix transform in adf frame.
         Matrix4 adfTplane =
-                adfTdevice.multiply(mExtrinsics.getDeviceTDepthCamera()).multiply(depthTplane);
+                adfTdevice.multiply(extrinsicses.getDeviceTDepthCamera()).multiply(depthTplane);
 
         TangoPoseData planeFitPose = ScenePoseCalculator.matrixToTangoPose(adfTplane);
         planeFitPose.baseFrame = TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION;

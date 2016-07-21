@@ -68,7 +68,7 @@ public class CornerMeasurement {
         return result;
     }
 
-    public double angleBetweenIgnoringZ(final Vector3 v1, final Vector3 v2) {
+    private double angleBetweenIgnoringZ(final Vector3 v1, final Vector3 v2) {
         Vector3 vA = v1.clone();
         vA.z = 0;
         Vector3 vB = v2.clone();
