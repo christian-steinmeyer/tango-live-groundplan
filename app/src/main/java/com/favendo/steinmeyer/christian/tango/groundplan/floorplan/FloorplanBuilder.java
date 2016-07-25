@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.floorplan;
+
+import com.favendo.steinmeyer.christian.tango.groundplan.measurement.CornerMeasurement;
 
 import org.rajawali3d.math.vector.Vector3;
 
@@ -23,7 +25,7 @@ import java.util.List;
 /**
  * Builder that knows how to build a Floorplan given a list of WallMeasurements.
  */
-public class PlanBuilder {
+public class FloorplanBuilder {
 
     /**
      * Creates a new Floorplan object beased on the measurements that we have so far.

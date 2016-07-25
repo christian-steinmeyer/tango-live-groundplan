@@ -1,4 +1,4 @@
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.measurement;
 
 import com.google.atap.tangoservice.TangoPoseData;
 
@@ -60,12 +60,11 @@ public class CornerMeasurement {
 
         double vertexAngle = Math.toRadians(angleBetweenIgnoringZ(vertex, otherCorner.vertex));
 
-        boolean result = vertexAngle < maxDeviation &&
+        return vertexAngle < maxDeviation &&
                 ((wall.angleBetween(otherCorner.wall) < maxDeviation &&
                         otherWall.angleBetween(otherCorner.otherWall) < maxDeviation) ||
                         (wall.angleBetween(otherCorner.otherWall) < maxDeviation &&
                                 otherWall.angleBetween(otherCorner.wall) < maxDeviation));
-        return result;
     }
 
     private double angleBetweenIgnoringZ(final Vector3 v1, final Vector3 v2) {

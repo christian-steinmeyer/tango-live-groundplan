@@ -1,4 +1,4 @@
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.measurement;
 
 /**
  * Some simple methods for operations on vectors, given as arrays of {@link double}s.
