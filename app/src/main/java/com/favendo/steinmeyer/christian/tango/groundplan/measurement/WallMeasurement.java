@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.measurement;
 
 import com.google.atap.tangoservice.TangoPoseData;
+import com.projecttango.rajawali.ScenePoseCalculator;
 
 import org.rajawali3d.math.Matrix4;
 import org.rajawali3d.math.vector.Vector3;
-
-import com.projecttango.rajawali.ScenePoseCalculator;
 
 /**
  * Representation of wall as a measured plane.
@@ -96,4 +95,19 @@ public class WallMeasurement {
         return mAdfTDevicePose.timestamp;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof WallMeasurement)) return false;
+
+        WallMeasurement that = (WallMeasurement) o;
+
+        return mAdfTPlanePose.equals(that.mAdfTPlanePose);
+
+    }
+
+    @Override
+    public int hashCode() {
+        return mAdfTPlanePose.hashCode();
+    }
 }

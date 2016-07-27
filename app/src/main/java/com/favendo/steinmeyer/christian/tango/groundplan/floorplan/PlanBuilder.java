@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.floorplan;
+
+import com.favendo.steinmeyer.christian.tango.groundplan.measurement.WallMeasurement;
 
 import org.rajawali3d.math.vector.Vector3;
 
@@ -34,7 +36,7 @@ public class PlanBuilder {
      *                            measurements. If false, continue the floor plan.
      */
     public static Floorplan buildPlan(List<WallMeasurement> wallMeasurementList, boolean closed) {
-        List<Vector3> planPoints = new ArrayList<Vector3>();
+        List<Vector3> planPoints = new ArrayList<>();
         WallMeasurement lastWallMeasurement = null;
         // Intersect every measurement with the previous one and add the result to the plan.
         if (!wallMeasurementList.isEmpty()) {

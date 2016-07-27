@@ -1,14 +1,15 @@
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.measurement;
 
 import java.util.Locale;
 
 /**
  * Some simple methods for operations on vectors, given as arrays of {@link double}s.
+ *
  * @author Christian Steinmeyer on 30.05.2016.
  */
 public class VectorUtilities {
 
-    private VectorUtilities(){
+    private VectorUtilities() {
         super();
     }
 
@@ -47,7 +48,7 @@ public class VectorUtilities {
      */
     public static double getAngleBetweenVectors(double[] a, double[] b) {
         double numerator = 0;
-        for (int i = 0; i < Math.min(a.length, b.length); i++){
+        for (int i = 0; i < Math.min(a.length, b.length); i++) {
             numerator += a[i] * b[i];
         }
         double denominator = getLength(a) * getLength(b);

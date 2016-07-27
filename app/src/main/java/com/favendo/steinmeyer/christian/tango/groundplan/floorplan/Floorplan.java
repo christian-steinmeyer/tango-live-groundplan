@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.favendo.steinmeyer.christian.tango.groundplan;
+package com.favendo.steinmeyer.christian.tango.groundplan.floorplan;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -38,7 +38,7 @@ public class Floorplan {
     /**
      * The list of points of the plan.
      */
-    private List<Vector3> mPlanPoints = new ArrayList<Vector3>();
+    private List<Vector3> mPlanPoints = new ArrayList<>();
 
     public Floorplan(List<Vector3> planPoints) {
         mPlanPoints.addAll(planPoints);
@@ -136,7 +136,7 @@ public class Floorplan {
         Vector3 planCenter = getPlanCenter();
         // Get scale factor of the plan.
         double scale = getPlanScale(canvas.getHeight(), canvas.getWidth());
-        List<Vector3> scaledPoints = new ArrayList<Vector3>();
+        List<Vector3> scaledPoints = new ArrayList<>();
         for (Vector3 nextPoint : mPlanPoints) {
             Vector3 newPoint = new Vector3(nextPoint);
             newPoint.subtract(planCenter);
@@ -201,6 +201,6 @@ public class Floorplan {
     }
 
     public List<Vector3> getPlanPoints() {
-        return new ArrayList<Vector3>(mPlanPoints);
+        return new ArrayList<>(mPlanPoints);
     }
 }
