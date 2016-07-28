@@ -23,7 +23,7 @@ import org.rajawali3d.math.vector.Vector3;
 import com.projecttango.rajawali.ScenePoseCalculator;
 
 /**
- * Representation of wall as a measured plane.
+ * Representation of mWall as a measured plane.
  */
 public class WallMeasurement {
     /**
@@ -71,7 +71,7 @@ public class WallMeasurement {
         Matrix4 worldTOtherPlane =
                 ScenePoseCalculator.tangoPoseToMatrix(otherWallMeasurement.getPlanePose());
         // We will calculate the intersection in the frame of the first transformation.
-        // Transform the second wall measurement to the first measurement frame
+        // Transform the second mWall measurement to the first measurement frame
         Matrix4 firstPlaneTsecondPlane = worldTPlane.clone().inverse().multiply(worldTOtherPlane);
 
         // The translation of the second transform origin, in the first one's frame

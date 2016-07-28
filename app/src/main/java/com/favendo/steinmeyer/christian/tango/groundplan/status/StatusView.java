@@ -15,11 +15,12 @@ import java.util.Collection;
  * Created by Christian Steinmeyer on 25.07.2016.
  */
 public class StatusView extends View {
+    private static final int RADIUS = 15;
+    private static final int ALPHA = 50;
+
     private Paint mCandidatePaint;
     private Paint mNoCandidatePaint;
-    private int RADIUS = 15;
-    private int ALPHA = 50;
-    private Collection<Circle> circles = new ArrayList<>();
+    private Collection<Circle> mCircles = new ArrayList<>();
 
     public StatusView(Context context) {
         super(context);
@@ -40,14 +41,14 @@ public class StatusView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         synchronized (this) {
-            for (Circle circle : circles) {
-                canvas.drawCircle(circle.x, circle.y, circle.radius, circle.paint);
+            for (Circle circle : mCircles) {
+                canvas.drawCircle(circle.mX, circle.mY, circle.mRadius, circle.mPaint);
             }
         }
     }
 
     public void clear() {
-        circles.clear();
+        mCircles.clear();
     }
 
     public void addCircle(float x, float y, boolean isCandidate) {
@@ -55,7 +56,7 @@ public class StatusView extends View {
         int width = getWidth();
         int height = getHeight();
         synchronized (this) {
-            circles.add(new Circle(width * x, height * y, RADIUS, paint));
+            mCircles.add(new Circle(width * x, height * y, RADIUS, paint));
         }
     }
 }

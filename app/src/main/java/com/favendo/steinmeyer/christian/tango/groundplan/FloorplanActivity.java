@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * click and a 3D object will be placed in the scene anchored at that location. A {@code
  * WallMeasurement} will be recorded for that plane.
  * <p>
- * You need to take exactly one measurement per wall in clockwise order. As you take measurements,
+ * You need to take exactly one measurement per mWall in clockwise order. As you take measurements,
  * the perimeter of the floor plan will be displayed as lines in AR. After you have taken all the
  * measurements you can press the 'Done' button and the final result will be drawn in 2D as seen
  * from above along with labels showing the sizes of the walls.
@@ -83,13 +83,15 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
     private final CornerMeasurer mCornerMeasurer = new CornerMeasurer(this);
     // Record Device to Area Description as the main frame pair to be used for device pose
     // queries.
-
-    private StatusView status;
     private static final TangoCoordinateFramePair FRAME_PAIR =
             new TangoCoordinateFramePair(TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION,
                     TangoPoseData.COORDINATE_FRAME_DEVICE);
     private static final int INVALID_TEXTURE_ID = 0;
+    private static final int SECS_TO_MILLISECS = 1000;
+    private static final double UPDATE_INTERVAL_MS = 1000.0 / 3;
 
+
+    private StatusView mStatus;
     private RajawaliSurfaceView mSurfaceView;
     private FloorplanRenderer mRenderer;
     private TangoCameraIntrinsics mIntrinsics;
@@ -110,10 +112,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
     private AtomicBoolean mIsFrameAvailableTangoThread = new AtomicBoolean(false);
     private double mRgbTimestampGlThread;
 
-    // Time
-    private static final int SECS_TO_MILLISECS = 1000;
     private double mXyIjPreviousTimeStamp;
-    private static final double UPDATE_INTERVAL_MS = 1000.0 / 3;
     private double mXyzIjTimeToNextUpdate = UPDATE_INTERVAL_MS;
 
 
@@ -123,8 +122,8 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
 
         setContentView(R.layout.activity_main);
 
-        status = new StatusView(this);
-        getWindow().addContentView(status,
+        mStatus = new StatusView(this);
+        getWindow().addContentView(mStatus,
                 new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -445,7 +444,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
         mRenderer.removeCornerMeasurements();
         for (CornerMeasurement cornerMeasurement : mCornerMeasurer.getMeasurements()) {
             TangoPoseData newDevicePose =
-                    mTango.getPoseAtTime(cornerMeasurement.wallMeasurement.getDevicePoseTimeStamp(),
+                    mTango.getPoseAtTime(cornerMeasurement.mWallMeasurement.getDevicePoseTimeStamp(),
                             FRAME_PAIR);
             cornerMeasurement.update(newDevicePose);
             mRenderer.addCornerMeasurement(cornerMeasurement);
@@ -468,12 +467,12 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
 
     @Override
     public void clear() {
-        status.clear();
+        mStatus.clear();
     }
 
     @Override
     public void addCircle(final float x, final float y, final boolean valid) {
-        status.addCircle(x, y, valid);
+        mStatus.addCircle(x, y, valid);
     }
 
     @Override
@@ -481,7 +480,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                status.invalidate();
+                mStatus.invalidate();
             }
         });
     }

@@ -45,7 +45,7 @@ public class Floorplan {
     }
 
     /**
-     * Draw a 2D representation of the plan with text labels for the length of each wall.
+     * Draw a 2D representation of the plan with text labels for the length of each mWall.
      *
      * @param canvas The Canvas to draw the plan on.
      * @param paint  The Paint object describing the colors and styles for the plan.
@@ -88,7 +88,7 @@ public class Floorplan {
     }
 
     /**
-     * Draw text labels for the length of each wall.
+     * Draw text labels for the length of each mWall.
      */
     private void drawTexts(Canvas canvas, Paint paint) {
         int centerX = canvas.getWidth() / 2;
@@ -107,7 +107,7 @@ public class Floorplan {
                     double length = Math.sqrt(
                             (lastPoint.x - nextPoint.x) * (lastPoint.x - nextPoint.x) +
                                     (lastPoint.y - nextPoint.y) * (lastPoint.y - nextPoint.y));
-                    // Draw the label in the middle of each wall.
+                    // Draw the label in the middle of each mWall.
                     double posX = centerX + (lastScaledPoint.x + nextScaledPoint.x) / 2;
                     double posY = centerY - (lastScaledPoint.y + nextScaledPoint.y) / 2;
                     canvas.drawText(String.format("%.2f", length) + "m", (float) posX, (float)
@@ -121,7 +121,7 @@ public class Floorplan {
                     (lastPoint.x - mPlanPoints.get(0).x) * (lastPoint.x - mPlanPoints.get(0).x) +
                             (lastPoint.y - mPlanPoints.get(0).y) * (lastPoint.y - mPlanPoints.get
                                     (0).y));
-            // Draw the label in the middle of each wall.
+            // Draw the label in the middle of each mWall.
             double posX = centerX + (lastScaledPoint.x + scaledFloorplan.mPlanPoints.get(0).x) / 2;
             double posY = centerY - (lastScaledPoint.y + scaledFloorplan.mPlanPoints.get(0).y) / 2;
             canvas.drawText(String.format("%.2f", length) + "m", (float) posX, (float) posY, paint);

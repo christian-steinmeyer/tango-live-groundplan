@@ -114,7 +114,7 @@ public class FloorplanRenderer extends RajawaliRenderer {
         mPlaneMaterial.setColor(0xff009900);
         mPlaneMaterial.setColorInfluence(0.5f);
         try {
-            Texture t = new Texture("wall", R.drawable.wall);
+            Texture t = new Texture("mWall", R.drawable.wall);
             mPlaneMaterial.addTexture(t);
         } catch (ATexture.TextureException e) {
             e.printStackTrace();
@@ -237,8 +237,8 @@ public class FloorplanRenderer extends RajawaliRenderer {
      * represent the measurement.
      */
     public synchronized void addCornerMeasurement(CornerMeasurement cornerMeasurement) {
-        mNewPoseList.add(getPoseInCorrectFrame(cornerMeasurement.wallMeasurement));
-        mNewPoseList.add(getPoseInCorrectFrame(cornerMeasurement.otherWallMeasurement));
+        mNewPoseList.add(getPoseInCorrectFrame(cornerMeasurement.mWallMeasurement));
+        mNewPoseList.add(getPoseInCorrectFrame(cornerMeasurement.mOtherWallMeasurement));
         mObjectPoseUpdated = true;
     }
 

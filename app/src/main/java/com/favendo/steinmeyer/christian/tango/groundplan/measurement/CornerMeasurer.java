@@ -18,13 +18,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CornerMeasurer {
-    List<CornerMeasurement> mCornerMeasurementList;
-    IStatusUpdater mStatusUpdater;
-    DeviceExtrinsics mExtrinsics;
-    TangoCameraIntrinsics mIntrinsics;
+    private static final double MAX_DEVIATION = Math.PI / 90; // = 2°
+
+    private List<CornerMeasurement> mCornerMeasurementList;
+    private IStatusUpdater mStatusUpdater;
+    private DeviceExtrinsics mExtrinsics;
+    private TangoCameraIntrinsics mIntrinsics;
 
     // Accuracy
-    private static final double MAX_DEVIATION = Math.PI / 90; // = 2°
 
 
     public CornerMeasurer(IStatusUpdater statusUpdater) {

@@ -32,7 +32,7 @@ public class FloorplanBuilder {
      *
      * @param cornerMeasurementList
      *         List of WallMeasurements to use as input to build the plan. It must have only one
-     *         measurement per wall.
+     *         measurement per mWall.
      * @param closed
      *         If true, close the floor plan and intersect the first and last measurements. If
      *         false, continue the floor plan.
@@ -42,7 +42,7 @@ public class FloorplanBuilder {
         List<Vector3> planPoints = new ArrayList<>();
         // Intersect every measurement with the previous one and add the result to the plan.
         for (CornerMeasurement cornerMeasurement : cornerMeasurementList) {
-            planPoints.add(cornerMeasurement.vertex);
+            planPoints.add(cornerMeasurement.mVertex);
         }
         return new Floorplan(planPoints);
     }

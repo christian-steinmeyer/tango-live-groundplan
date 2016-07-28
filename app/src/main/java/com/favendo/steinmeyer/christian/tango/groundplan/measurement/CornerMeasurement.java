@@ -13,36 +13,37 @@ import org.rajawali3d.math.vector.Vector3;
  */
 public class CornerMeasurement {
 
-    public WallMeasurement wallMeasurement;
-    public WallMeasurement otherWallMeasurement;
-    public Vector3 vertex;
-    public Quaternion wall;
-    public Quaternion otherWall;
-    private double maxDeviation = Math.PI / 90;
+    private static final double MAX_DEVIATION = Math.PI / 90;
+
+    public WallMeasurement mWallMeasurement;
+    public WallMeasurement mOtherWallMeasurement;
+    public Vector3 mVertex;
+    public Quaternion mWall;
+    public Quaternion mOtherWall;
 
 
     public CornerMeasurement(WallMeasurement wallMeasurement,
                              WallMeasurement otherWallMeasurement) {
-        this.wallMeasurement = wallMeasurement;
-        this.otherWallMeasurement = otherWallMeasurement;
+        this.mWallMeasurement = wallMeasurement;
+        this.mOtherWallMeasurement = otherWallMeasurement;
 
         calculateCorner();
     }
 
     private void calculateCorner() {
-        vertex = wallMeasurement.intersect(otherWallMeasurement);
-        double[] r1 = wallMeasurement.getPlanePose().rotation;
-        this.wall = new Quaternion(r1[3], r1[0], r1[1], r1[2]);
-        double[] r2 = otherWallMeasurement.getPlanePose().rotation;
-        this.otherWall = new Quaternion(r2[3], r2[0], r2[1], r2[2]);
+        mVertex = mWallMeasurement.intersect(mOtherWallMeasurement);
+        double[] r1 = mWallMeasurement.getPlanePose().rotation;
+        this.mWall = new Quaternion(r1[3], r1[0], r1[1], r1[2]);
+        double[] r2 = mOtherWallMeasurement.getPlanePose().rotation;
+        this.mOtherWall = new Quaternion(r2[3], r2[0], r2[1], r2[2]);
         // NOTE: Rajawali quaternions use a left-hand rotation around the axis convention.
     }
 
     public boolean isNeighbor(CornerMeasurement otherCorner) {
-        return wall.angleBetween(otherCorner.wall) < maxDeviation ||
-                (wall.angleBetween(otherCorner.otherWall) < maxDeviation ||
-                        (otherWall.angleBetween(otherCorner.wall) < maxDeviation ||
-                                (otherWall.angleBetween(otherCorner.otherWall) < maxDeviation)));
+        return mWall.angleBetween(otherCorner.mWall) < MAX_DEVIATION ||
+                (mWall.angleBetween(otherCorner.mOtherWall) < MAX_DEVIATION ||
+                        (mOtherWall.angleBetween(otherCorner.mWall) < MAX_DEVIATION ||
+                                (mOtherWall.angleBetween(otherCorner.mOtherWall) < MAX_DEVIATION)));
     }
 
     @Override
@@ -58,13 +59,13 @@ public class CornerMeasurement {
         }
         CornerMeasurement otherCorner = (CornerMeasurement) other;
 
-        double vertexAngle = Math.toRadians(angleBetweenIgnoringZ(vertex, otherCorner.vertex));
+        double vertexAngle = Math.toRadians(angleBetweenIgnoringZ(mVertex, otherCorner.mVertex));
 
-        return vertexAngle < maxDeviation &&
-                ((wall.angleBetween(otherCorner.wall) < maxDeviation &&
-                        otherWall.angleBetween(otherCorner.otherWall) < maxDeviation) ||
-                        (wall.angleBetween(otherCorner.otherWall) < maxDeviation &&
-                                otherWall.angleBetween(otherCorner.wall) < maxDeviation));
+        return vertexAngle < MAX_DEVIATION &&
+                ((mWall.angleBetween(otherCorner.mWall) < MAX_DEVIATION &&
+                        mOtherWall.angleBetween(otherCorner.mOtherWall) < MAX_DEVIATION) ||
+                        (mWall.angleBetween(otherCorner.mOtherWall) < MAX_DEVIATION &&
+                                mOtherWall.angleBetween(otherCorner.mWall) < MAX_DEVIATION));
     }
 
     private double angleBetweenIgnoringZ(final Vector3 v1, final Vector3 v2) {
@@ -76,8 +77,8 @@ public class CornerMeasurement {
     }
 
     public void update(TangoPoseData newPoseData){
-        this.wallMeasurement.update(newPoseData);
-        this.otherWallMeasurement.update(newPoseData);
+        this.mWallMeasurement.update(newPoseData);
+        this.mOtherWallMeasurement.update(newPoseData);
         calculateCorner();
     }
 }

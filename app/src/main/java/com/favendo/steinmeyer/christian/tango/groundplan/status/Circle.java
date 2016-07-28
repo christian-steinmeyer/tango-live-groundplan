@@ -8,15 +8,15 @@ import android.graphics.Paint;
  * Created by Christian Steinmeyer on 25.07.2016.
  */
 class Circle {
-    public float x;
-    public float y;
-    public int radius;
-    public Paint paint;
+    public float mX;
+    public float mY;
+    public int mRadius;
+    public Paint mPaint;
 
     public Circle(float x, float y, int radius, Paint paint) {
-        this.x = x;
-        this.y = y;
-        this.radius = radius;
-        this.paint = paint;
+        this.mX = x;
+        this.mY = y;
+        this.mRadius = radius;
+        this.mPaint = paint;
     }
 }
