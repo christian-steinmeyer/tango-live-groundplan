@@ -4,7 +4,6 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.util.Log;
 import android.view.View;
 
 import java.util.ArrayList;
@@ -39,7 +38,7 @@ public class StatusView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         for (Circle circle : mCircles) {
-            canvas.drawCircle(circle.x, circle.y, circle.radius, circle.paint);
+            canvas.drawCircle(circle.mX, circle.mY, circle.mRadius, circle.mPaint);
         }
     }
 

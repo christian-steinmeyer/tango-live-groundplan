@@ -24,11 +24,11 @@ import java.util.List;
  */
 public class WallMeasurer {
 
-    List<WallMeasurement> mWallMeasurements;
-    WallMeasurement mLastWallMeasurement;
-    IStatusUpdater mStatusUpdater;
-    DeviceExtrinsics mExtrinsics;
-    TangoCameraIntrinsics mIntrinsics;
+    private List<WallMeasurement> mWallMeasurements;
+    private WallMeasurement mLastWallMeasurement;
+    private IStatusUpdater mStatusUpdater;
+    private DeviceExtrinsics mExtrinsics;
+    private TangoCameraIntrinsics mIntrinsics;
 
     public WallMeasurer(IStatusUpdater statusUpdater) {
         mWallMeasurements = new ArrayList<>();
