@@ -7,6 +7,8 @@ Clone this repository to your machine (e.g. `C://Android/Projects/tango-groundpl
 Then, clone [the official java examples](https://github.com/googlesamples/tango-examples-java) at release **MIRA** and copy `java_examples_utils` and `TangoReleaseLibs` to the **same** directory (e.g. `C://Android/Projects/`).
 Finally, import the project with Android Studio.
 
+Note, that two approaches are tackled. One scans for walls (see [according branch](https://github.com/christian-steinmeyer/tango-live-groundplan/tree/walls)), the other scans for corners (see [according branch](https://github.com/christian-steinmeyer/tango-live-groundplan/tree/corners)).
+
 ## Usage
 Start the app, wait for about 10 seconds, tap on "Measure", and start moving the device slowly through your location. 
 If it recognizes a room, it is highlighed and displayed in AR. Make sure to scan the walls in clockwise direction (move to your right).
