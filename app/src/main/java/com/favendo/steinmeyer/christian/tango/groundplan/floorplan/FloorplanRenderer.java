@@ -169,21 +169,6 @@ public class FloorplanRenderer extends RajawaliRenderer {
         super.onRender(elapsedRealTime, deltaTime);
     }
 
-    private FloatBuffer removeAnythingButWalls(FloatBuffer xyz) {
-        List<Float> result = new ArrayList<>();
-        for (int i = 0; i < xyz.capacity() - 3; i = i + 3) {
-            // TODO if in wall
-            result.add(xyz.get(i));
-            result.add(xyz.get(i + 1));
-            result.add(xyz.get(i + 2));
-        }
-        float[] resultPrimitive = new float[result.size()];
-        for (int i = 0; i < result.size(); i++) {
-            resultPrimitive[i] = result.get(i);
-        }
-        return FloatBuffer.wrap(resultPrimitive);
-    }
-
     /**
      * Update the scene camera based on the provided pose in Tango start of service frame.
      * The device pose should match the pose of the device at the time of the last rendered RGB

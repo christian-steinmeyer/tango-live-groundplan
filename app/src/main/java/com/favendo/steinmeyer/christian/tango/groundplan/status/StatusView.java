@@ -16,11 +16,11 @@ import java.util.Collection;
  * Created by Christian Steinmeyer on 27.07.2016.
  */
 public class StatusView extends View {
-    private String TAG = "StatusView";
+    private static final int RADIUS = 20;
+
     private Paint mWallPaint;
     private Paint mNotWallPaint;
-    private int RADIUS = 20;
-    private Collection<Circle> circles = new ArrayList<>();
+    private Collection<Circle> mCircles = new ArrayList<>();
 
     public StatusView(Context context) {
         super(context);
@@ -38,21 +38,19 @@ public class StatusView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        Log.i(TAG, "drawing " + circles.size() + " circles");
-        for (Circle circle : circles) {
+        for (Circle circle : mCircles) {
             canvas.drawCircle(circle.x, circle.y, circle.radius, circle.paint);
         }
     }
 
     public void clear() {
-        Log.i(TAG, "Clearing");
-        circles.clear();
+        mCircles.clear();
     }
 
     public void addCircle(float x, float y, boolean inWall) {
         Paint paint = inWall ? mWallPaint : mNotWallPaint;
         int width = getWidth();
         int height = getHeight();
-        circles.add(new Circle(width * x, height * y, RADIUS, paint));
+        mCircles.add(new Circle(width * x, height * y, RADIUS, paint));
     }
 }

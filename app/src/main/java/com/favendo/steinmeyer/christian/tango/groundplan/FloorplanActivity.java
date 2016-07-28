@@ -82,13 +82,15 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
     private static final String TAG = FloorplanActivity.class.getSimpleName();
     // Record Device to Area Description as the main frame pair to be used for device pose
     // queries.
-
-    private StatusView status;
-    private WallMeasurer mWallMeasurer;
     private static final TangoCoordinateFramePair FRAME_PAIR =
             new TangoCoordinateFramePair(TangoPoseData.COORDINATE_FRAME_AREA_DESCRIPTION,
                     TangoPoseData.COORDINATE_FRAME_DEVICE);
     private static final int INVALID_TEXTURE_ID = 0;
+    private static final int SECS_TO_MILLISECS = 1000;
+    private static final double UPDATE_INTERVAL_MS = 250.0;
+
+    private StatusView mStatus;
+    private WallMeasurer mWallMeasurer;
 
     private RajawaliSurfaceView mSurfaceView;
     private FloorplanRenderer mRenderer;
@@ -110,10 +112,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
     private AtomicBoolean mIsFrameAvailableTangoThread = new AtomicBoolean(false);
     private double mRgbTimestampGlThread;
 
-    // Time
-    private static final int SECS_TO_MILLISECS = 1000;
     private double mXyIjPreviousTimeStamp;
-    private static final double UPDATE_INTERVAL_MS = 250.0;
     private double mXyzIjTimeToNextUpdate = UPDATE_INTERVAL_MS;
 
     @Override
@@ -122,9 +121,9 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
 
         setContentView(R.layout.activity_main);
 
-        status = new StatusView(this);
+        mStatus = new StatusView(this);
         mWallMeasurer = new WallMeasurer(this);
-        getWindow().addContentView(status,
+        getWindow().addContentView(mStatus,
                 new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -152,6 +151,20 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // Check if it has permissions.
+        // Area learning permissions are needed in order to save the adf.
+        if (Tango.hasPermission(this, Tango.PERMISSIONTYPE_ADF_LOAD_SAVE)) {
+            connectAndStart();
+        } else {
+            startActivityForResult(
+                    Tango.getRequestPermissionIntent(Tango.PERMISSIONTYPE_ADF_LOAD_SAVE),
+                    Tango.TANGO_INTENT_ACTIVITYCODE);
+        }
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         // Synchronize against disconnecting while the service is being used in the OpenGL thread or
@@ -169,19 +182,6 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Check if it has permissions.
-        // Area learning permissions are needed in order to save the adf.
-        if (Tango.hasPermission(this, Tango.PERMISSIONTYPE_ADF_LOAD_SAVE)) {
-            connectAndStart();
-        } else {
-            startActivityForResult(
-                    Tango.getRequestPermissionIntent(Tango.PERMISSIONTYPE_ADF_LOAD_SAVE),
-                    Tango.TANGO_INTENT_ACTIVITYCODE);
-        }
-    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -454,12 +454,12 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
 
     @Override
     public void clear() {
-        status.clear();
+        mStatus.clear();
     }
 
     @Override
     public void addCircle(float x, float y, boolean valid) {
-        status.addCircle(x, y, valid);
+        mStatus.addCircle(x, y, valid);
     }
 
     @Override
@@ -467,7 +467,7 @@ public class FloorplanActivity extends Activity implements View.OnTouchListener,
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                status.invalidate();
+                mStatus.invalidate();
             }
         });
     }

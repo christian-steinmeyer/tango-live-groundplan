@@ -8,6 +8,7 @@ import com.google.atap.tangoservice.TangoXyzIjData;
 import com.projecttango.rajawali.DeviceExtrinsics;
 import com.projecttango.rajawali.ScenePoseCalculator;
 import com.projecttango.tangosupport.TangoSupport;
+import com.projecttango.tangosupport.TangoSupport.IntersectionPointPlaneModelPair;
 
 import org.rajawali3d.math.Matrix4;
 import org.rajawali3d.math.Quaternion;
@@ -18,7 +19,7 @@ import java.util.List;
 
 /**
  * This class contains all logic for detecting walls and handle measurements.
- * <p/>
+ * <p>
  * Created by Christian Steinmeyer on 27.07.2016.
  */
 public class WallMeasurer {
@@ -57,7 +58,7 @@ public class WallMeasurer {
         return wallOrientation.angleBetween(newWallOrientation);
     }
 
-    public boolean isAlignedWithGravity(TangoSupport.IntersectionPointPlaneModelPair candidate,
+    public boolean isAlignedWithGravity(IntersectionPointPlaneModelPair candidate,
                                         TangoPoseData devicePose, double maxDeviation) {
         Matrix4 adfTdevice = ScenePoseCalculator.tangoPoseToMatrix(devicePose);
         Vector3 gravityVector = ScenePoseCalculator.TANGO_WORLD_UP.clone();
@@ -71,7 +72,7 @@ public class WallMeasurer {
         return (Math.abs(target - angle) <= maxDeviation);
     }
 
-    public int getIndexOfMostPairs(List<TangoSupport.IntersectionPointPlaneModelPair> candidates,
+    public int getIndexOfMostPairs(List<IntersectionPointPlaneModelPair> candidates,
                                    boolean[][] candidatePairs) {
         int max = 0;
         int index = -1;
@@ -88,7 +89,7 @@ public class WallMeasurer {
         return index;
     }
 
-    public void findPairs(List<TangoSupport.IntersectionPointPlaneModelPair> candidates,
+    public void findPairs(List<IntersectionPointPlaneModelPair> candidates,
                           double maxDeviation,
                           boolean[][] candidatePairs) {
         for (int i = 0; i < candidates.size(); i++) {
@@ -103,12 +104,12 @@ public class WallMeasurer {
         }
     }
 
-    public TangoSupport.IntersectionPointPlaneModelPair getAverage(
-            List<TangoSupport.IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
+    public IntersectionPointPlaneModelPair getAverage(
+            List<IntersectionPointPlaneModelPair> intersectionPointPlaneModelPairs) {
 
         double[] intersectionPoint = new double[3];
         double[] planeModel = new double[4];
-        for (TangoSupport.IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
+        for (IntersectionPointPlaneModelPair each : intersectionPointPlaneModelPairs) {
             for (int i = 0; i < 3; i++) {
                 intersectionPoint[i] += each.intersectionPoint[i];
                 planeModel[i] += each.planeModel[i];
@@ -120,7 +121,7 @@ public class WallMeasurer {
             planeModel[i] = planeModel[i] / intersectionPointPlaneModelPairs.size();
         }
         planeModel[3] = planeModel[3] / intersectionPointPlaneModelPairs.size(); // see above
-        return new TangoSupport.IntersectionPointPlaneModelPair(intersectionPoint, planeModel);
+        return new IntersectionPointPlaneModelPair(intersectionPoint, planeModel);
     }
 
     /**
@@ -155,9 +156,9 @@ public class WallMeasurer {
         return planeFitPose;
     }
 
-    public List<TangoSupport.IntersectionPointPlaneModelPair> getWinners(
-            List<TangoSupport.IntersectionPointPlaneModelPair> candidates, double maxDeviation) {
-        List<TangoSupport.IntersectionPointPlaneModelPair> result = new ArrayList<>();
+    public List<IntersectionPointPlaneModelPair> getWinners(
+            List<IntersectionPointPlaneModelPair> candidates, double maxDeviation) {
+        List<IntersectionPointPlaneModelPair> result = new ArrayList<>();
         boolean[][] candidatePairs = new boolean[candidates.size()][candidates.size()];
 
         findPairs(candidates, maxDeviation, candidatePairs);
@@ -174,12 +175,12 @@ public class WallMeasurer {
         return result;
     }
 
-    public List<TangoSupport.IntersectionPointPlaneModelPair> getCandidates(TangoXyzIjData xyzIj,
-                                                                            TangoPoseData devicePose,
-                                                                            TangoPoseData colorTdepthPose,
-                                                                            int horizontals,
-                                                                            int verticals) {
-        List<TangoSupport.IntersectionPointPlaneModelPair> candidates = new ArrayList<>();
+    public List<IntersectionPointPlaneModelPair> getCandidates(TangoXyzIjData xyzIj,
+                                                               TangoPoseData devicePose,
+                                                               TangoPoseData colorTdepthPose,
+                                                               int horizontals,
+                                                               int verticals) {
+        List<IntersectionPointPlaneModelPair> candidates = new ArrayList<>();
 
         float hStep = 1f / (horizontals + 1f);
         float vStep = 1f / (verticals + 1f);
@@ -188,7 +189,7 @@ public class WallMeasurer {
         for (float x = hStep; x < 1f; x += hStep) {
             for (float y = vStep; y < 1f; y += vStep) {
                 try {
-                    TangoSupport.IntersectionPointPlaneModelPair candidate = TangoSupport
+                    IntersectionPointPlaneModelPair candidate = TangoSupport
                             .fitPlaneModelNearClick(xyzIj, mIntrinsics, colorTdepthPose, x, y);
                     if (isAlignedWithGravity(candidate, devicePose, 0.02)) {
                         candidates.add(candidate);
@@ -218,16 +219,16 @@ public class WallMeasurer {
      * @param verticals       number of vertical measure points (in one column)
      * @param minCommons      number of common measure points required for positive feedback     @return average of
      */
-    public TangoSupport.IntersectionPointPlaneModelPair measureWall(TangoXyzIjData xyzIj,
-                                                                    TangoPoseData devicePose,
-                                                                    TangoPoseData colorTdepthPose,
-                                                                    int horizontals, int verticals,
-                                                                    int minCommons) {
+    public IntersectionPointPlaneModelPair measureWall(TangoXyzIjData xyzIj,
+                                                       TangoPoseData devicePose,
+                                                       TangoPoseData colorTdepthPose,
+                                                       int horizontals, int verticals,
+                                                       int minCommons) {
 
-        List<TangoSupport.IntersectionPointPlaneModelPair> candidates =
+        List<IntersectionPointPlaneModelPair> candidates =
                 getCandidates(xyzIj, devicePose, colorTdepthPose, horizontals, verticals);
 
-        List<TangoSupport.IntersectionPointPlaneModelPair> winners = getWinners(candidates, 0.02);
+        List<IntersectionPointPlaneModelPair> winners = getWinners(candidates, 0.02);
         if (winners.size() < minCommons) {
             return null;
         }
@@ -240,8 +241,8 @@ public class WallMeasurer {
      * location in the color camera frame. It returns the pose of the fitted plane in a
      * TangoPoseData structure.
      *
-     * @param xyzIj depth information used for wall measurement
-     * @param devicePose needed to put new wall into context
+     * @param xyzIj        depth information used for wall measurement
+     * @param devicePose   needed to put new wall into context
      * @param rgbTimestamp needed to put new wall into context
      */
     public WallMeasurement doWallMeasurement(TangoXyzIjData xyzIj, TangoPoseData devicePose,
@@ -258,7 +259,7 @@ public class WallMeasurer {
                 .calculateRelativePose(rgbTimestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR,
                         xyzIj.timestamp, TangoPoseData.COORDINATE_FRAME_CAMERA_DEPTH);
 
-        TangoSupport.IntersectionPointPlaneModelPair wall =
+        IntersectionPointPlaneModelPair wall =
                 measureWall(xyzIj, devicePose, colorTdepthPose, 3, 3, 4);
         if (wall == null) {
             return null;
